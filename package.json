@@ -1,0 +1,25 @@
+{
+  "name": "trazena",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trazena — Plataforma de gestión del conocimiento y documentación jerárquica",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build:shared && npm run build:web && npm run build:api",
+    "build:shared": "npm --workspace=@trazena/shared run build",
+    "build:web": "npm --workspace=@trazena/web run build",
+    "build:api": "npm --workspace=@trazena/api run typecheck",
+    "dev:web": "npm --workspace=@trazena/web run start",
+    "dev:api": "npm --workspace=@trazena/api run dev",
+    "typecheck": "npm --workspace=@trazena/shared run build && npm --workspace=@trazena/api run typecheck && npm --workspace=@trazena/web run typecheck",
+    "db:migrate:local": "npm --workspace=@trazena/api run db:migrate:local",
+    "db:migrate:remote": "npm --workspace=@trazena/api run db:migrate:remote"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  }
+}

@@ -1,0 +1,39 @@
+# Dependencies & package manager caches
+node_modules/
+.npm/
+.pnpm-store/
+
+# Build & compiler outputs
+dist/
+out-tsc/
+*.tsbuildinfo
+.angular/
+.wrangler/
+
+# Local environment & production config (keep local-only; use .example templates in Git)
+.env
+.env.*
+!.env.example
+.dev.vars
+*.local.json
+apps/web/src/environments/environment.prod.ts
+apps/web/src/environments/environment.local.ts
+apps/api/wrangler.toml
+
+# Firebase / Cloudflare local caches & debug logs
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Tooling, browser automation & OS/IDE artifacts
+.playwright-mcp/
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log
+*.swp
+*.swo
