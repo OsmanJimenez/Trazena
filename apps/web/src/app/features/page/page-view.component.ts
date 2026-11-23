@@ -10,14 +10,18 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { ResolvedRouteResult } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
+import { AtralumeDialog } from '@osmanjimenez/atralume/dialog';
 import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
+import { KnowledgeMetaService } from '../../core/knowledge/knowledge-meta.service';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
+import { PageExportDialogComponent, type ExportDialogData } from '../export/page-export-dialog.component';
 import { PageBreadcrumbsComponent } from './page-breadcrumbs.component';
 import { PageEditorComponent } from './page-editor.component';
 import { PageHistoryPanelComponent } from './page-history-panel.component';
+import { PageKnowledgePanelComponent } from './page-knowledge-panel.component';
 
 @Component({
   selector: 'trz-page-view',
@@ -31,6 +35,7 @@ import { PageHistoryPanelComponent } from './page-history-panel.component';
     PageBreadcrumbsComponent,
     PageEditorComponent,
     PageHistoryPanelComponent,
+    PageKnowledgePanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -45,6 +50,25 @@ import { PageHistoryPanelComponent } from './page-history-panel.component';
           <div class="doc-header-bar">
             <trz-page-breadcrumbs [segments]="data.breadcrumbs" />
             <div class="doc-actions">
+              <button
+                atrButton
+                type="button"
+                size="small"
+                appearance="text"
+                [title]="meta.isFavorite(page.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+                (click)="toggleFavorite(page.id)"
+              >
+                {{ meta.isFavorite(page.id) ? '★ Favorito' : '☆ Favorito' }}
+              </button>
+              <button atrButton type="button" size="small" appearance="text" (click)="knowledgeOpen.set(!knowledgeOpen())">
+                {{ knowledgeOpen() ? 'Ocultar propiedades' : 'Propiedades / TOC' }}
+              </button>
+              <button atrButton type="button" size="small" appearance="text" (click)="openExport(page)">
+                Exportar
+              </button>
+              <button atrButton type="button" size="small" appearance="text" (click)="saveAsTemplate(page)">
+                Plantilla
+              </button>
               <button atrButton type="button" size="small" appearance="text" (click)="historyOpen.set(!historyOpen())">
                 Historial
               </button>
@@ -119,6 +143,10 @@ import { PageHistoryPanelComponent } from './page-history-panel.component';
               (closed)="historyOpen.set(false)"
               (restored)="onHistoryRestored($event)"
             />
+          }
+
+          @if (knowledgeOpen()) {
+            <trz-page-knowledge-panel [page]="page" [markdown]="page.content.markdown" />
           }
 
           <trz-page-editor
@@ -298,16 +326,19 @@ import { PageHistoryPanelComponent } from './page-history-panel.component';
 })
 export class PageViewComponent {
   protected readonly store = inject(KnowledgeStore);
+  protected readonly meta = inject(KnowledgeMetaService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
   private readonly dialogs = inject(TrazenaDialogsService);
+  private readonly dialog = inject(AtralumeDialog);
 
   protected readonly resolved = signal<ResolvedRouteResult | null>(null);
   protected readonly notFound = signal(false);
   protected readonly titleDraft = signal('');
   protected readonly moveOpen = signal(false);
   protected readonly historyOpen = signal(false);
+  protected readonly knowledgeOpen = signal(true);
   protected readonly moveTargetWsId = signal('');
   protected readonly moveTargetParentId = signal('');
 
@@ -360,6 +391,55 @@ export class PageViewComponent {
 
     this.resolved.set(res);
     this.titleDraft.set(res.page.title);
+    await this.meta.initialize();
+    void this.meta.recordRecentVisit(res.page.id);
+  }
+
+  protected async toggleFavorite(pageId: string): Promise<void> {
+    const added = await this.meta.toggleFavorite(pageId);
+    this.snackbar.open({
+      message: added ? 'Añadida a favoritos.' : 'Quitada de favoritos.',
+      tone: 'info',
+    });
+  }
+
+  protected openExport(page: { id: string; title: string }): void {
+    const data: ExportDialogData = {
+      defaultScope: 'page',
+      allowSubtreeToggle: true,
+      targetIds: [page.id],
+      title: page.title,
+    };
+    this.dialog.open(PageExportDialogComponent, {
+      data,
+      size: 'm',
+      closable: false,
+    });
+  }
+
+  protected async saveAsTemplate(page: {
+    organizationId: string;
+    title: string;
+    content: { markdown: string };
+  }): Promise<void> {
+    const name = await this.dialogs.prompt({
+      title: 'Guardar como plantilla',
+      label: 'Nombre de la plantilla reutilizable',
+      initialValue: page.title,
+      confirmText: 'Guardar plantilla',
+    });
+    if (!name) return;
+    await this.meta.saveTemplate({
+      organizationId: page.organizationId,
+      name,
+      category: 'Personalizada',
+      description: `Plantilla creada a partir de "${page.title}".`,
+      markdown: page.content.markdown,
+    });
+    this.snackbar.open({
+      message: `Plantilla "${name}" guardada en /templates.`,
+      tone: 'success',
+    });
   }
 
   protected async commitTitle(): Promise<void> {

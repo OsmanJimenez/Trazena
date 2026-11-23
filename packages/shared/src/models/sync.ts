@@ -1,13 +1,23 @@
 export const APP_PROTOCOL_VERSIONS = {
-  appVersion: '0.2.0',
+  appVersion: '0.3.0',
   apiVersion: 1,
   syncProtocolVersion: 1,
-  localSchemaVersion: 2,
-  remoteSchemaVersion: 2,
+  localSchemaVersion: 3,
+  remoteSchemaVersion: 3,
   minimumCompatibleAppVersion: '0.2.0',
 } as const;
 
-export type SyncEntityType = 'organization' | 'workspace' | 'page';
+export type SyncEntityType =
+  | 'organization'
+  | 'workspace'
+  | 'page'
+  | 'tag'
+  | 'page_tag'
+  | 'property_definition'
+  | 'property_value'
+  | 'saved_view'
+  | 'template'
+  | 'favorite';
 
 export type SyncOperationKind =
   | 'create'

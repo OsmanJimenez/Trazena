@@ -226,7 +226,34 @@ select {
   }
 }
 
-/* Atralume Dialog modal surface alignment */
+/* Atralume Dialog modal surface alignment & smooth entrance transitions */
+@keyframes trz-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes trz-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes trz-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 tui-dialog[data-appearance="atr-dialog"] {
   background: var(--trz-bg-elevated) !important;
   color: var(--trz-text) !important;
@@ -234,6 +261,29 @@ tui-dialog[data-appearance="atr-dialog"] {
   border-radius: var(--trz-radius-lg) !important;
   box-shadow: var(--trz-shadow-md) !important;
   padding: 1.35rem 1.5rem !important;
+  animation: trz-modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+tui-modal[role="dialog"],
+tui-modal[role="alertdialog"],
+.sidebar-backdrop {
+  animation: trz-fade-in 160ms ease-out both;
+}
+
+atr-snackbar-panel,
+.atr-snackbar-panel {
+  animation: trz-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  tui-dialog[data-appearance="atr-dialog"],
+  tui-modal[role="dialog"],
+  tui-modal[role="alertdialog"],
+  .sidebar-backdrop,
+  atr-snackbar-panel,
+  .atr-snackbar-panel {
+    animation: none !important;
+  }
 }
 
 /* --- Notion-style single-canvas Tiptap / ProseMirror document styles --- */

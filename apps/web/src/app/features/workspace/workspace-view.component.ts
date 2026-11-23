@@ -5,11 +5,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Organization, Workspace } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeCard } from '@osmanjimenez/atralume/card';
+import { AtralumeDialog } from '@osmanjimenez/atralume/dialog';
 import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
+import { PageExportDialogComponent, type ExportDialogData } from '../export/page-export-dialog.component';
 import { PageBreadcrumbsComponent } from '../page/page-breadcrumbs.component';
 
 @Component({
@@ -39,6 +41,9 @@ import { PageBreadcrumbsComponent } from '../page/page-breadcrumbs.component';
             <div class="actions">
               <button atrButton type="button" size="small" appearance="filled" (click)="createRootPage(org, ws)">
                 + Nueva página
+              </button>
+              <button atrButton type="button" size="small" appearance="outlined" (click)="exportWs(ws)">
+                Exportar
               </button>
               <button atrButton type="button" size="small" appearance="outlined" (click)="editing.set(!editing())">
                 Editar espacio
@@ -147,6 +152,7 @@ export class WorkspaceViewComponent {
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
   private readonly dialogs = inject(TrazenaDialogsService);
+  private readonly dialog = inject(AtralumeDialog);
 
   private readonly orgSlug = signal('');
   private readonly wsSlug = signal('');
@@ -231,6 +237,19 @@ export class WorkspaceViewComponent {
     if (updated.slug !== ws.slug) {
       await this.router.navigate(['/o', org.slug, updated.slug], { replaceUrl: true });
     }
+  }
+
+  protected exportWs(ws: Workspace): void {
+    const data: ExportDialogData = {
+      defaultScope: 'workspace',
+      targetIds: [ws.id],
+      title: ws.name,
+    };
+    this.dialog.open(PageExportDialogComponent, {
+      data,
+      size: 'm',
+      closable: false,
+    });
   }
 
   protected async deleteWs(org: Organization, ws: Workspace): Promise<void> {

@@ -61,6 +61,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'explore',
+        loadComponent: () =>
+          import('./features/content-explorer/content-explorer.component').then(
+            (m) => m.ContentExplorerComponent,
+          ),
+      },
+      {
+        path: 'templates',
+        loadComponent: () =>
+          import('./features/templates/templates-view.component').then(
+            (m) => m.TemplatesViewComponent,
+          ),
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings.component').then(

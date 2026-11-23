@@ -17,7 +17,7 @@ import { APP_BUILD_META } from '../diagnostics/app-version';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service';
 
 const DB_NAME = 'trazena_vault_v1';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const MAX_LOCAL_HISTORY_PER_PAGE = 3;
 
 export type StoreName =
@@ -33,6 +33,14 @@ export type StoreName =
   | 'sync_sessions'
   | 'sync_conflicts'
   | 'sync_device'
+  | 'tags'
+  | 'page_tags'
+  | 'property_definitions'
+  | 'property_values'
+  | 'saved_views'
+  | 'templates'
+  | 'favorites'
+  | 'recent_visits'
   | 'meta';
 
 export interface MigrationProgressState {
@@ -198,6 +206,42 @@ export class IndexedDbService {
               db.createObjectStore('sync_device', { keyPath: 'deviceId' });
             }
           }
+
+          // v3 Knowledge & Publishing stores (non-destructive expand)
+          if (oldVersion < 3) {
+            if (!db.objectStoreNames.contains('tags')) {
+              const store = db.createObjectStore('tags', { keyPath: 'id' });
+              store.createIndex('by_org', 'organizationId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('page_tags')) {
+              const store = db.createObjectStore('page_tags', { keyPath: 'id' });
+              store.createIndex('by_page', 'pageId', { unique: false });
+              store.createIndex('by_tag', 'tagId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('property_definitions')) {
+              const store = db.createObjectStore('property_definitions', { keyPath: 'id' });
+              store.createIndex('by_org', 'organizationId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('property_values')) {
+              const store = db.createObjectStore('property_values', { keyPath: 'id' });
+              store.createIndex('by_page', 'pageId', { unique: false });
+              store.createIndex('by_prop', 'propertyId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('saved_views')) {
+              db.createObjectStore('saved_views', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('templates')) {
+              db.createObjectStore('templates', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('favorites')) {
+              const store = db.createObjectStore('favorites', { keyPath: 'id' });
+              store.createIndex('by_owner', 'ownerUid', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('recent_visits')) {
+              const store = db.createObjectStore('recent_visits', { keyPath: 'id' });
+              store.createIndex('by_owner', 'ownerUid', { unique: false });
+            }
+          }
         } catch (err) {
           this._migrationState.set({
             status: 'failed',
@@ -341,7 +385,7 @@ export class IndexedDbService {
   // --- Atomic Local-First writes (Entity + Consolidated Outbox in 1 IDB transaction) ---
 
   async commitAtomicWithOutbox<T>(
-    storeName: 'organizations' | 'workspaces' | 'pages',
+    storeName: StoreName,
     entity: T,
     mutation: LocalMutation,
     extraContent?: PageContent,

@@ -25,7 +25,10 @@ import Link from '@tiptap/extension-link';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { Markdown } from 'tiptap-markdown';
 import { common, createLowlight } from 'lowlight';
+import { Router } from '@angular/router';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
+import { KnowledgeMetaService } from '../../core/knowledge/knowledge-meta.service';
+import { SearchEngineService } from '../../core/search/search-engine.service';
 import { KnowledgeStore, type SaveStatus } from '../../core/state/knowledge.store';
 import { TrazenaUpdateService } from '../../core/update/trazena-update.service';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
@@ -63,6 +66,7 @@ const lowlight = createLowlight(common);
           <button type="button" class="fmt-btn" [class.active]="isActive('codeBlock')" title="Bloque de código" (click)="cmd('toggleCodeBlock')">Código</button>
           <button type="button" class="fmt-btn" title="Insertar tabla" (click)="insertTable()">Tabla</button>
           <button type="button" class="fmt-btn" title="Insertar enlace" (click)="setLink()">Enlace</button>
+          <button type="button" class="fmt-btn" title="Insertar enlace interno entre páginas ([[...]])" (click)="insertInternalLink()">[[Página]]</button>
           <button type="button" class="fmt-btn" title="Separador" (click)="cmd('setHorizontalRule')">―</button>
         </div>
 
@@ -78,7 +82,7 @@ const lowlight = createLowlight(common);
         </div>
       }
 
-      <div #editorHost class="trz-notion-editor" (keydown)="onKeydown($event)"></div>
+      <div #editorHost class="trz-notion-editor" (keydown)="onKeydown($event)" (click)="onEditorClick($event)"></div>
 
       <footer class="editor-meta">
         <span>{{ wordCount() }} palabras</span>
@@ -220,6 +224,9 @@ export class PageEditorComponent implements AfterViewInit {
   readonly saved = output<{ revision: number; markdown: string }>();
 
   protected readonly store = inject(KnowledgeStore);
+  private readonly meta = inject(KnowledgeMetaService);
+  private readonly search = inject(SearchEngineService);
+  private readonly router = inject(Router);
   private readonly updater = inject(TrazenaUpdateService);
   private readonly dialogs = inject(TrazenaDialogsService);
   private readonly destroyRef = inject(DestroyRef);
@@ -371,6 +378,38 @@ export class PageEditorComponent implements AfterViewInit {
       .run();
   }
 
+  protected async insertInternalLink(): Promise<void> {
+    if (!this.editor) return;
+    const query = await this.dialogs.prompt({
+      title: 'Enlace interno entre páginas',
+      label: 'Escribe parte del título de la página destino',
+      placeholder: 'Ej. Editor Markdown…',
+      confirmText: 'Insertar enlace',
+    });
+    if (!query) return;
+    const active = this.store.pages().filter((p) => p.status === 'active' && p.id !== this.pageId());
+    const target = active.find((p) => p.title.toLowerCase().includes(query.toLowerCase()));
+    if (!target) return;
+    this.editor
+      .chain()
+      .focus()
+      .insertContent(`<a href="trazena://page/${target.id}">${target.title}</a> `)
+      .run();
+  }
+
+  protected onEditorClick(event: MouseEvent): void {
+    const anchor = (event.target as HTMLElement | null)?.closest('a');
+    const href = anchor?.getAttribute('href') ?? '';
+    if (href.startsWith('trazena://page/')) {
+      event.preventDefault();
+      const targetId = href.slice('trazena://page/'.length);
+      const path = this.store.getCanonicalPath(targetId);
+      if (path && path !== '/') {
+        void this.router.navigateByUrl(path);
+      }
+    }
+  }
+
   protected onKeydown(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
       event.preventDefault();
@@ -411,6 +450,8 @@ export class PageEditorComponent implements AfterViewInit {
     this.updater.setUnsavedEditorDraft(false);
     if (result) {
       this.activeRevision = result.revision;
+      this.search.upsertPage(result, result.content.markdown);
+      void this.meta.updateBacklinksForPage(result.id, result.content.markdown);
       this.saved.emit({ revision: result.revision, markdown: result.content.markdown });
     }
   }

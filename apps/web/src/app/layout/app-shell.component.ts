@@ -8,19 +8,24 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs';
 import type { SearchResultItem } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
+import { AtralumeDialog } from '@osmanjimenez/atralume/dialog';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeIconButton } from '@osmanjimenez/atralume/icon-button';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { AuthService } from '../core/auth/auth.service';
+import { KnowledgeMetaService } from '../core/knowledge/knowledge-meta.service';
 import { KnowledgeStore } from '../core/state/knowledge.store';
 import { ThemeService } from '../core/state/theme.service';
 import { TrazenaSyncService } from '../core/sync/trazena-sync.service';
 import { TrazenaUpdateService } from '../core/update/trazena-update.service';
 import { TrazenaDialogsService } from '../core/ui/trazena-dialogs.service';
 import { PageTreeComponent } from '../features/page/page-tree.component';
+import { QuickSearchDialogComponent } from '../features/search/quick-search-dialog.component';
 
 @Component({
   selector: 'trz-app-shell',
@@ -91,10 +96,29 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
           <atr-icon name="search" size="small" />
           <input
             type="search"
-            placeholder="Buscar…"
+            placeholder="Filtrar árbol…"
             [ngModel]="searchQuery()"
             (ngModelChange)="onSearch($event)"
           />
+          <button
+            type="button"
+            class="kbd-btn"
+            title="Búsqueda rápida global (Ctrl+K)"
+            (click)="openQuickSearch()"
+          >
+            Ctrl+K
+          </button>
+        </div>
+
+        <div class="quick-nav">
+          <a routerLink="/explore" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="search" size="small" />
+            <span>Explorar</span>
+          </a>
+          <a routerLink="/templates" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="file-text" size="small" />
+            <span>Plantillas</span>
+          </a>
         </div>
 
         @if (searchQuery().trim().length >= 2) {
@@ -115,6 +139,34 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
           </div>
         } @else {
           <nav class="sidebar-scroll">
+            @if (favoritePages().length > 0) {
+              <div class="section-header">
+                <span class="section-label">★ Favoritos</span>
+              </div>
+              <div class="mini-list">
+                @for (fav of favoritePages(); track fav.id) {
+                  <a class="mini-page-link" [routerLink]="fav.path" (click)="closeOnMobile()">
+                    <atr-icon name="file-text" size="small" />
+                    <span>{{ fav.title }}</span>
+                  </a>
+                }
+              </div>
+            }
+
+            @if (recentPages().length > 0) {
+              <div class="section-header">
+                <span class="section-label">Recientes</span>
+              </div>
+              <div class="mini-list">
+                @for (rec of recentPages(); track rec.id) {
+                  <a class="mini-page-link" [routerLink]="rec.path" (click)="closeOnMobile()">
+                    <atr-icon name="file-text" size="small" />
+                    <span>{{ rec.title }}</span>
+                  </a>
+                }
+              </div>
+            }
+
             @if (activeOrg(); as org) {
               <div class="section-header">
                 <a [routerLink]="['/o', org.slug]" class="section-link" (click)="closeOnMobile()">
@@ -223,6 +275,17 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
           </div>
 
           <div class="topbar-right">
+            <button
+              atrButton
+              type="button"
+              size="small"
+              appearance="text"
+              title="Búsqueda rápida (Ctrl+K)"
+              (click)="openQuickSearch()"
+            >
+              Buscar
+            </button>
+
             <button
               atrButton
               type="button"
@@ -378,6 +441,82 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       }
     }
 
+    .kbd-btn {
+      appearance: none;
+      border: 1px solid var(--trz-border);
+      border-radius: 4px;
+      background: var(--trz-bg-subtle);
+      color: var(--trz-text-subtle);
+      font-family: var(--trz-font-mono);
+      font-size: 0.66rem;
+      padding: 0.1rem 0.35rem;
+      cursor: pointer;
+      flex-shrink: 0;
+
+      &:hover {
+        color: var(--trz-text);
+        border-color: var(--trz-border-strong);
+      }
+    }
+
+    .quick-nav {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.3rem;
+      padding: 0 0.75rem 0.5rem;
+    }
+
+    .quick-nav-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0.34rem 0.45rem;
+      border: 1px solid var(--trz-border);
+      border-radius: var(--trz-radius-sm);
+      background: var(--trz-bg);
+      color: var(--trz-text-muted);
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 500;
+
+      &:hover,
+      &.is-active {
+        background: var(--trz-accent-soft);
+        border-color: var(--trz-accent);
+        color: var(--trz-accent);
+      }
+    }
+
+    .mini-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      margin-bottom: 0.55rem;
+    }
+
+    .mini-page-link {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.24rem 0.45rem;
+      border-radius: var(--trz-radius-sm);
+      text-decoration: none;
+      color: var(--trz-text-muted);
+      font-size: 0.8rem;
+
+      span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      &:hover {
+        background: var(--trz-bg-hover);
+        color: var(--trz-text);
+      }
+    }
+
     .sidebar-scroll,
     .search-results {
       flex: 1;
@@ -451,6 +590,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       border-radius: var(--trz-radius-sm);
 
       &.is-active {
+        background: var(--trz-accent-soft);
         color: var(--trz-accent);
       }
     }
@@ -626,6 +766,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
 })
 export class AppShellComponent implements OnInit {
   protected readonly store = inject(KnowledgeStore);
+  protected readonly meta = inject(KnowledgeMetaService);
   protected readonly auth = inject(AuthService);
   protected readonly theme = inject(ThemeService);
   protected readonly sync = inject(TrazenaSyncService);
@@ -633,7 +774,9 @@ export class AppShellComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
   private readonly dialogs = inject(TrazenaDialogsService);
+  private readonly dialog = inject(AtralumeDialog);
   private readonly destroyRef = inject(DestroyRef);
+  private quickSearchOpen = false;
 
   protected readonly isMobile = signal(
     typeof window !== 'undefined' ? window.innerWidth <= 900 : false,
@@ -654,6 +797,26 @@ export class AppShellComponent implements OnInit {
     return org ? this.store.getWorkspacesForOrg(org.id) : [];
   });
 
+  protected readonly favoritePages = computed(() => {
+    const pages = this.store.pages();
+    return this.meta
+      .favorites()
+      .map((f) => pages.find((p) => p.id === f.pageId && p.status !== 'deleted'))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      .slice(0, 6)
+      .map((p) => ({ id: p.id, title: p.title, path: this.store.getCanonicalPath(p.id) }));
+  });
+
+  protected readonly recentPages = computed(() => {
+    const pages = this.store.pages();
+    return this.meta
+      .recents()
+      .map((r) => pages.find((p) => p.id === r.pageId && p.status !== 'deleted'))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      .slice(0, 5)
+      .map((p) => ({ id: p.id, title: p.title, path: this.store.getCanonicalPath(p.id) }));
+  });
+
   constructor() {
     if (typeof window !== 'undefined') {
       const mql = window.matchMedia('(max-width: 900px)');
@@ -662,15 +825,63 @@ export class AppShellComponent implements OnInit {
         this.sidebarOpen.set(!e.matches);
       };
       mql.addEventListener('change', onChange);
-      this.destroyRef.onDestroy(() => mql.removeEventListener('change', onChange));
+
+      const onKeydown = (ev: KeyboardEvent) => {
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+          ev.preventDefault();
+          this.openQuickSearch();
+        }
+      };
+      window.addEventListener('keydown', onKeydown);
+
+      this.destroyRef.onDestroy(() => {
+        mql.removeEventListener('change', onChange);
+        window.removeEventListener('keydown', onKeydown);
+      });
     }
+
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed(),
+      )
+      .subscribe((e) => this.syncSelectedOrgFromUrl(e.urlAfterRedirects));
   }
 
   async ngOnInit(): Promise<void> {
     await this.store.initialize();
-    const first = this.store.activeOrganizations()[0];
-    if (first && !this.selectedOrgId()) {
-      this.selectedOrgId.set(first.id);
+    await this.meta.initialize();
+    this.syncSelectedOrgFromUrl(this.router.url);
+    if (!this.selectedOrgId()) {
+      const first = this.store.activeOrganizations()[0];
+      if (first) this.selectedOrgId.set(first.id);
+    }
+  }
+
+  protected openQuickSearch(): void {
+    if (this.quickSearchOpen) return;
+    this.quickSearchOpen = true;
+    const ref = this.dialog.open(QuickSearchDialogComponent, {
+      size: 'm',
+      closable: false,
+    });
+    ref.afterClosed.subscribe({
+      complete: () => {
+        this.quickSearchOpen = false;
+      },
+      error: () => {
+        this.quickSearchOpen = false;
+      },
+    });
+  }
+
+  private syncSelectedOrgFromUrl(url: string): void {
+    const match = url.match(/^\/o\/([^/?#]+)/);
+    if (!match) return;
+    const orgSlug = decodeURIComponent(match[1]);
+    const found = this.store.activeOrganizations().find((o) => o.slug === orgSlug);
+    if (found && found.id !== this.selectedOrgId()) {
+      this.selectedOrgId.set(found.id);
     }
   }
 
@@ -720,6 +931,7 @@ export class AppShellComponent implements OnInit {
       organizationId: orgId,
       name,
     });
+    this.selectedOrgId.set(orgId);
     const org = this.store.activeOrganizations().find((o) => o.id === orgId);
     this.snackbar.open({ message: `Espacio "${ws.name}" creado.`, tone: 'success' });
     this.closeOnMobile();

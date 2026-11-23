@@ -5,11 +5,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Organization } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeCard } from '@osmanjimenez/atralume/card';
+import { AtralumeDialog } from '@osmanjimenez/atralume/dialog';
 import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
+import { PageExportDialogComponent, type ExportDialogData } from '../export/page-export-dialog.component';
 
 @Component({
   selector: 'trz-organization-view',
@@ -33,7 +35,7 @@ import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
               Editar
             </button>
             <button atrButton type="button" size="small" appearance="outlined" (click)="exportOrg(org)">
-              Exportar JSON
+              Exportar
             </button>
             <button atrButton type="button" size="small" appearance="text" (click)="deleteOrg(org)">
               Eliminar
@@ -146,6 +148,7 @@ export class OrganizationViewComponent {
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
   private readonly dialogs = inject(TrazenaDialogsService);
+  private readonly dialog = inject(AtralumeDialog);
 
   private readonly slug = signal('');
   protected readonly editing = signal(false);
@@ -203,16 +206,17 @@ export class OrganizationViewComponent {
     await this.router.navigate(['/o', org.slug, ws.slug]);
   }
 
-  protected async exportOrg(org: Organization): Promise<void> {
-    const payload = await this.store.exportOrganization(org.id);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `trazena-${org.slug}-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    this.snackbar.open({ message: 'Exportación JSON descargada.', tone: 'success' });
+  protected exportOrg(org: Organization): void {
+    const data: ExportDialogData = {
+      defaultScope: 'organization',
+      targetIds: [org.id],
+      title: org.name,
+    };
+    this.dialog.open(PageExportDialogComponent, {
+      data,
+      size: 'm',
+      closable: false,
+    });
   }
 
   protected async deleteOrg(org: Organization): Promise<void> {

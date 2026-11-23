@@ -34,6 +34,13 @@ const ENTITY_ORDER: Record<LocalMutation['entityType'], number> = {
   organization: 0,
   workspace: 1,
   page: 2,
+  tag: 3,
+  page_tag: 4,
+  property_definition: 5,
+  property_value: 6,
+  saved_view: 7,
+  template: 8,
+  favorite: 9,
 };
 
 /**

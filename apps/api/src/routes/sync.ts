@@ -35,7 +35,18 @@ const pushSchema = z.object({
     .array(
       z.object({
         operationId: z.string().min(1).max(120),
-        entityType: z.enum(['organization', 'workspace', 'page']),
+        entityType: z.enum([
+          'organization',
+          'workspace',
+          'page',
+          'tag',
+          'page_tag',
+          'property_definition',
+          'property_value',
+          'saved_view',
+          'template',
+          'favorite',
+        ]),
         entityId: z.string().min(1).max(120),
         operation: z.enum(['create', 'update', 'move', 'archive', 'restore', 'delete']),
         baseRevision: z.number().int().nullable(),
@@ -577,6 +588,108 @@ syncRoutes.post('/sync/push', async (c) => {
             sequence: seq,
           });
         }
+      } else if (op.entityType === 'tag') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        await c.env.DB.prepare(
+          `INSERT INTO tags (id, organization_id, name, normalized_name, color, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, normalized_name = excluded.normalized_name, color = excluded.color, status = excluded.status, updated_at = excluded.updated_at`,
+        )
+          .bind(op.entityId, orgId, String(p['name'] ?? ''), String(p['normalizedName'] ?? ''), String(p['color'] ?? '#0f766e'), String(p['status'] ?? 'active'), op.createdAt, now)
+          .run();
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'page_tag') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        if (op.operation === 'delete') {
+          await c.env.DB.prepare(`DELETE FROM page_tags WHERE id = ?`).bind(op.entityId).run();
+        } else {
+          await c.env.DB.prepare(
+            `INSERT OR IGNORE INTO page_tags (id, page_id, tag_id, organization_id, created_at) VALUES (?, ?, ?, ?, ?)`,
+          )
+            .bind(op.entityId, String(p['pageId'] ?? ''), String(p['tagId'] ?? ''), orgId, op.createdAt)
+            .run();
+        }
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'property_definition') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        await c.env.DB.prepare(
+          `INSERT INTO property_definitions (id, organization_id, name, type, options_json, position, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, type = excluded.type, options_json = excluded.options_json, position = excluded.position, status = excluded.status, updated_at = excluded.updated_at`,
+        )
+          .bind(op.entityId, orgId, String(p['name'] ?? ''), String(p['type'] ?? 'text'), JSON.stringify(p['options'] ?? []), String(p['position'] ?? '0000001000'), String(p['status'] ?? 'active'), op.createdAt, now)
+          .run();
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'property_value') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        if (op.operation === 'delete') {
+          await c.env.DB.prepare(`DELETE FROM property_values WHERE id = ?`).bind(op.entityId).run();
+        } else {
+          await c.env.DB.prepare(
+            `INSERT INTO property_values (id, page_id, property_id, organization_id, value_json, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+          )
+            .bind(op.entityId, String(p['pageId'] ?? ''), String(p['propertyId'] ?? ''), orgId, JSON.stringify(p['value'] ?? null), now)
+            .run();
+        }
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'saved_view') {
+        const p = op.payload as Record<string, unknown>;
+        await c.env.DB.prepare(
+          `INSERT INTO saved_views (id, user_id, organization_id, name, config_json, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, config_json = excluded.config_json, status = excluded.status, updated_at = excluded.updated_at`,
+        )
+          .bind(op.entityId, user.id, (p['organizationId'] as string | null) ?? null, String(p['name'] ?? ''), JSON.stringify(p), String(p['status'] ?? 'active'), op.createdAt, now)
+          .run();
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'template') {
+        const p = op.payload as Record<string, unknown>;
+        await c.env.DB.prepare(
+          `INSERT INTO templates (id, user_id, organization_id, name, category, description, markdown, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET name = excluded.name, category = excluded.category, description = excluded.description, markdown = excluded.markdown, status = excluded.status, updated_at = excluded.updated_at`,
+        )
+          .bind(op.entityId, user.id, (p['organizationId'] as string | null) ?? null, String(p['name'] ?? ''), String(p['category'] ?? 'General'), String(p['description'] ?? ''), String(p['markdown'] ?? ''), String(p['status'] ?? 'active'), op.createdAt, now)
+          .run();
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'favorite') {
+        const p = op.payload as Record<string, unknown>;
+        if (op.operation === 'delete') {
+          await c.env.DB.prepare(`DELETE FROM user_favorites WHERE id = ? AND user_id = ?`).bind(op.entityId, user.id).run();
+        } else {
+          await c.env.DB.prepare(
+            `INSERT OR IGNORE INTO user_favorites (id, user_id, page_id, created_at) VALUES (?, ?, ?, ?)`,
+          )
+            .bind(op.entityId, user.id, String(p['pageId'] ?? ''), op.createdAt)
+            .run();
+        }
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
       }
     } catch (err) {
       results.push({
