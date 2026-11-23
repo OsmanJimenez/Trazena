@@ -262,10 +262,20 @@ tui-dialog[data-appearance="atr-dialog"] {
   box-shadow: var(--trz-shadow-md) !important;
   padding: 1.35rem 1.5rem !important;
   animation: trz-modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  pointer-events: auto !important;
+
+  &.tui-enter,
+  &.tui-animated {
+    pointer-events: auto !important;
+  }
 }
 
 tui-modal[role="dialog"],
-tui-modal[role="alertdialog"],
+tui-modal[role="alertdialog"] {
+  pointer-events: auto !important;
+  animation: trz-fade-in 160ms ease-out both;
+}
+
 .sidebar-backdrop {
   animation: trz-fade-in 160ms ease-out both;
 }

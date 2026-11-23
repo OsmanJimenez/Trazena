@@ -94,6 +94,18 @@ export class ExportEngineService {
 
   readonly progress = this._progress.asReadonly();
 
+  resetProgress(): void {
+    this.cancelled = false;
+    this._progress.set({
+      phase: 'idle',
+      message: '',
+      processedPages: 0,
+      totalPages: 0,
+      warnings: [],
+      errorMessage: null,
+    });
+  }
+
   cancelCurrentExport(): void {
     this.cancelled = true;
     this._progress.update((p) => ({

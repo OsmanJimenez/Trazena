@@ -157,6 +157,7 @@ export class PageExportDialogComponent implements OnInit {
   protected readonly pdfMode = signal<'combined' | 'separate'>('combined');
 
   async ngOnInit(): Promise<void> {
+    this.engine.resetProgress();
     const prefs = await this.engine.getSavedPreferences();
     this.format.set(prefs.format);
     this.includeArchived.set(prefs.includeArchived);
