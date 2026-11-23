@@ -59,13 +59,68 @@ function escapeHtml(text: string): string {
  */
 function pdfSafeText(text: string): string {
   return text
+    .replace(/\r/g, '')
+    .replace(/\t/g, '  ')
     .replace(/[—–]/g, '-')
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
     .replace(/…/g, '...')
     .replace(/•/g, '-')
     .replace(/☑/g, '[x]')
-    .replace(/☐/g, '[ ]');
+    .replace(/☐/g, '[ ]')
+    .replace(/→/g, '->')
+    .replace(/←/g, '<-')
+    .replace(/↔/g, '<->')
+    .replace(/⇒/g, '=>')
+    .replace(/⇐/g, '<=')
+    .replace(/[├└]/g, '|-')
+    .replace(/[│]/g, '|')
+    .replace(/[─═]/g, '-')
+    .replace(/[┌┐┘┬┴┼]/g, '+')
+    .replace(/✅/g, '[OK]')
+    .replace(/❌/g, '[X]')
+    .replace(/⚠️?/g, '[!]')
+    .replace(/[★☆]/g, '*')
+    // Strip any remaining non-WinAnsi / emoji characters that corrupt jsPDF built-in fonts
+    .replace(/[^\x20-\xFF]/g, '');
+}
+
+/**
+ * Wraps a single code line while preserving its leading indentation spaces
+ * (jsPDF's splitTextToSize strips leading whitespace).
+ */
+function wrapCodeLinePreservingIndent(
+  doc: jsPDF,
+  rawLine: string,
+  maxWidth: number,
+): string[] {
+  const safe = pdfSafeText(rawLine);
+  if (!safe.trim()) return [''];
+  const indentMatch = safe.match(/^(\s+)/);
+  const indent = indentMatch ? indentMatch[1] : '';
+  const body = safe.slice(indent.length);
+
+  if (doc.getTextWidth(safe) <= maxWidth) {
+    return [safe];
+  }
+
+  const out: string[] = [];
+  let current = indent;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (doc.getTextWidth(current + ch) > maxWidth && current.length > indent.length) {
+      out.push(current);
+      // Soft-wrap continuation indented slightly to stay readable
+      const contIndent = indent.length > 16 ? '    ' : indent + '  ';
+      current = contIndent + ch;
+    } else {
+      current += ch;
+    }
+  }
+  if (current.length > 0) {
+    out.push(current);
+  }
+  return out.length > 0 ? out : [''];
 }
 
 const PREFS_KEY = 'trazena_export_prefs';
@@ -635,41 +690,100 @@ export class ExportEngineService {
     doc.line(marginX, y, pageWidth - marginX, y);
     y += 7;
 
-    const lines = node.page.content.markdown.split('\n');
+    const lines = node.page.content.markdown.replace(/\r\n?/g, '\n').split('\n');
     let i = 0;
 
     while (i < lines.length) {
       const line = lines[i];
       const trimmed = line.trim();
 
-      // Fenced code block
-      if (trimmed.startsWith('```')) {
+      // Fenced code block (``` or ~~~)
+      const fenceMatch = trimmed.match(/^(`{3,}|~{3,})\s*([a-zA-Z0-9_+-]*)/);
+      if (fenceMatch) {
+        const fenceChar = fenceMatch[1][0];
+        const fenceLen = fenceMatch[1].length;
+        const lang = (fenceMatch[2] || '').toUpperCase();
+        const closeRe = new RegExp(`^${fenceChar}{${fenceLen},}\\s*$`);
         const codeLines: string[] = [];
         i++;
-        while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        while (i < lines.length && !closeRe.test(lines[i].trim())) {
           codeLines.push(lines[i]);
           i++;
         }
-        i++;
+        if (i < lines.length) i++;
+
         doc.setFont('courier', 'normal');
         doc.setFontSize(8.5);
-        doc.setTextColor(35, 40, 48);
+        const padX = 4;
+        const padY = 3.5;
+        const lineHeight = 4.4;
+        const innerWidth = maxWidth - padX * 2;
         const wrapped: string[] = [];
         for (const cl of codeLines) {
-          const split = doc.splitTextToSize(pdfSafeText(cl || ' '), maxWidth - 8) as string[];
-          wrapped.push(...split);
+          wrapped.push(...wrapCodeLinePreservingIndent(doc, cl, innerWidth));
         }
-        const blockHeight = wrapped.length * 4.3 + 6;
-        ensureSpace(Math.min(blockHeight, 45));
-        doc.setFillColor(244, 244, 242);
-        doc.setDrawColor(220, 220, 215);
-        for (const wl of wrapped) {
-          ensureSpace(6);
-          doc.rect(marginX, y - 3.5, maxWidth, 4.6, 'F');
-          doc.text(wl, marginX + 3, y);
-          y += 4.3;
+        if (wrapped.length === 0) wrapped.push('');
+
+        const headerHeight = lang ? 5.5 : 0;
+        let lineIdx = 0;
+        let isFirstChunk = true;
+
+        while (lineIdx < wrapped.length) {
+          const minNeeded = (isFirstChunk ? headerHeight : 0) + padY * 2 + lineHeight * 2;
+          if (y + minNeeded > pageHeight - 20) {
+            doc.addPage();
+            y = 20;
+          }
+
+          const availHeight = pageHeight - 20 - y;
+          const chunkHeader = isFirstChunk ? headerHeight : 0;
+          const maxLinesInChunk = Math.max(
+            1,
+            Math.floor((availHeight - chunkHeader - padY * 2) / lineHeight),
+          );
+          const chunk = wrapped.slice(lineIdx, lineIdx + maxLinesInChunk);
+          const boxHeight = chunkHeader + padY * 2 + chunk.length * lineHeight;
+
+          // Draw single clean background for the entire chunk first
+          doc.setFillColor(246, 246, 244);
+          doc.roundedRect(marginX, y, maxWidth, boxHeight, 1.8, 1.8, 'F');
+
+          // Optional language header strip
+          if (chunkHeader > 0) {
+            doc.setFillColor(235, 235, 231);
+            doc.roundedRect(marginX, y, maxWidth, chunkHeader, 1.8, 1.8, 'F');
+            // Square off bottom corners of header strip
+            doc.rect(marginX, y + chunkHeader - 1.8, maxWidth, 1.8, 'F');
+            doc.setDrawColor(218, 218, 212);
+            doc.setLineWidth(0.25);
+            doc.line(marginX, y + chunkHeader, marginX + maxWidth, y + chunkHeader);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7);
+            doc.setTextColor(100, 100, 95);
+            doc.text(lang, marginX + padX, y + 3.8);
+          }
+
+          // Crisp outer border on top
+          doc.setDrawColor(218, 218, 212);
+          doc.setLineWidth(0.3);
+          doc.roundedRect(marginX, y, maxWidth, boxHeight, 1.8, 1.8, 'S');
+
+          // Draw code lines cleanly on top of background (no overlapping rects)
+          doc.setFont('courier', 'normal');
+          doc.setFontSize(8.5);
+          doc.setTextColor(30, 35, 42);
+          let textY = y + chunkHeader + padY + 3.0;
+          for (const wl of chunk) {
+            if (wl) {
+              doc.text(wl, marginX + padX, textY);
+            }
+            textY += lineHeight;
+          }
+
+          y += boxHeight + 4;
+          lineIdx += chunk.length;
+          isFirstChunk = false;
         }
-        y += 4;
         continue;
       }
 
