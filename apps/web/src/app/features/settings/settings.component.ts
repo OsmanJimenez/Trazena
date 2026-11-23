@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import type { ThemePreference } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeCard } from '@osmanjimenez/atralume/card';
@@ -8,11 +7,12 @@ import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { AuthService } from '../../core/auth/auth.service';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { ThemeService } from '../../core/state/theme.service';
+import { SettingsNavComponent } from './settings-nav.component';
 
 @Component({
   selector: 'trz-settings',
   standalone: true,
-  imports: [RouterLink, AtralumeButton, AtralumeCard, AtralumeEmptyState],
+  imports: [AtralumeButton, AtralumeCard, AtralumeEmptyState, SettingsNavComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="settings-page">
@@ -21,10 +21,9 @@ import { ThemeService } from '../../core/state/theme.service';
           <h1>Configuración</h1>
           <p>Perfil, apariencia y gestión de papelera.</p>
         </div>
-        <a atrButton routerLink="/settings/storage" appearance="outlined" size="small">
-          Ver almacenamiento
-        </a>
       </header>
+
+      <trz-settings-nav />
 
       <atr-card appearance="outlined">
         <div class="card-inner">
@@ -38,8 +37,8 @@ import { ThemeService } from '../../core/state/theme.service';
             <strong>{{ auth.isFirebaseConfigured ? 'Firebase Authentication' : 'Bóveda Local (IndexedDB)' }}</strong>
           </div>
           <div class="info-row">
-            <span>Backend API</span>
-            <strong>{{ auth.isRemoteApiEnabled ? 'Cloudflare Workers + D1' : 'Offline-first local' }}</strong>
+            <span>Sincronización remota</span>
+            <strong>{{ auth.isRemoteApiEnabled ? 'Manual (Cloudflare Workers + D1)' : 'Offline-first local' }}</strong>
           </div>
         </div>
       </atr-card>
@@ -97,9 +96,8 @@ import { ThemeService } from '../../core/state/theme.service';
     </div>
   `,
   styles: `
-    .settings-page { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
-    .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
-    h1 { margin: 0; font-size: clamp(1.45rem, 2.5vw, 1.8rem); letter-spacing: -0.025em; }
+    .settings-page { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+    .header h1 { margin: 0; font-size: clamp(1.45rem, 2.5vw, 1.8rem); letter-spacing: -0.025em; }
     .header p { margin: 0.3rem 0 0; color: var(--trz-text-muted); font-size: 0.9rem; }
     .card-inner {
       padding: 1.25rem 1.35rem;

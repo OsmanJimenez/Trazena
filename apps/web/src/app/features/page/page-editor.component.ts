@@ -25,9 +25,9 @@ import Link from '@tiptap/extension-link';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { Markdown } from 'tiptap-markdown';
 import { common, createLowlight } from 'lowlight';
-import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { KnowledgeStore, type SaveStatus } from '../../core/state/knowledge.store';
+import { TrazenaUpdateService } from '../../core/update/trazena-update.service';
 
 interface MarkdownStorage {
   markdown?: {
@@ -40,7 +40,7 @@ const lowlight = createLowlight(common);
 @Component({
   selector: 'trz-page-editor',
   standalone: true,
-  imports: [AtralumeButton, AtralumeIcon],
+  imports: [AtralumeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="notion-editor-shell">
@@ -69,27 +69,6 @@ const lowlight = createLowlight(common);
           {{ statusLabel() }}
         </span>
       </div>
-
-      @if (store.conflict(); as conflict) {
-        @if (conflict.pageId === pageId()) {
-          <div class="conflict-banner" role="alert">
-            <div class="conflict-text">
-              <atr-icon name="warning" size="small" />
-              <span>
-                <strong>Conflicto de revisión:</strong> esta página fue modificada en otra sesión (rev. {{ conflict.serverRevision }}).
-              </span>
-            </div>
-            <div class="conflict-actions">
-              <button atrButton type="button" size="small" appearance="outlined" (click)="acceptServerVersion()">
-                Usar versión del servidor
-              </button>
-              <button atrButton type="button" size="small" appearance="filled" (click)="forceSaveLocal()">
-                Conservar mi versión
-              </button>
-            </div>
-          </div>
-        }
-      }
 
       @if (store.saveError(); as saveErr) {
         <div class="info-banner" role="status">
@@ -240,6 +219,7 @@ export class PageEditorComponent implements AfterViewInit {
   readonly saved = output<{ revision: number; markdown: string }>();
 
   protected readonly store = inject(KnowledgeStore);
+  private readonly updater = inject(TrazenaUpdateService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly editorHost = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
 
@@ -390,21 +370,6 @@ export class PageEditorComponent implements AfterViewInit {
     }
   }
 
-  protected async acceptServerVersion(): Promise<void> {
-    const conflict = this.store.conflict();
-    if (!conflict || !this.editor) return;
-    this.editor.commands.setContent(conflict.serverMarkdown, { emitUpdate: false });
-    this.activeRevision = conflict.serverRevision;
-    await this.flushSave();
-  }
-
-  protected async forceSaveLocal(): Promise<void> {
-    const conflict = this.store.conflict();
-    if (!conflict) return;
-    this.activeRevision = conflict.serverRevision;
-    await this.flushSave();
-  }
-
   private getMarkdown(): string {
     const storage = this.editor?.storage as MarkdownStorage | undefined;
     return storage?.markdown?.getMarkdown() ?? '';
@@ -417,6 +382,7 @@ export class PageEditorComponent implements AfterViewInit {
 
   private scheduleSave(): void {
     this.store.markPendingSave();
+    this.updater.setUnsavedEditorDraft(true);
     if (this.saveTimer) clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
       void this.flushSave();
@@ -434,6 +400,7 @@ export class PageEditorComponent implements AfterViewInit {
       markdown,
       this.activeRevision,
     );
+    this.updater.setUnsavedEditorDraft(false);
     if (result) {
       this.activeRevision = result.revision;
       this.saved.emit({ revision: result.revision, markdown: result.content.markdown });

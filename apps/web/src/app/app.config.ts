@@ -1,9 +1,11 @@
 import {
   ApplicationConfig,
+  isDevMode,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
+import { provideServiceWorker } from '@angular/service-worker';
 import { provideAtralume } from '@osmanjimenez/atralume';
 import {
   ATRALUME_BUILTIN_ICONS,
@@ -20,5 +22,9 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAtralume(),
     provideAtralumeIcons([...ATRALUME_BUILTIN_ICONS, ...TRAZENA_ICONS]),
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

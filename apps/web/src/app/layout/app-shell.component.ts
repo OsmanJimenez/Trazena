@@ -17,6 +17,8 @@ import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { AuthService } from '../core/auth/auth.service';
 import { KnowledgeStore } from '../core/state/knowledge.store';
 import { ThemeService } from '../core/state/theme.service';
+import { TrazenaSyncService } from '../core/sync/trazena-sync.service';
+import { TrazenaUpdateService } from '../core/update/trazena-update.service';
 import { PageTreeComponent } from '../features/page/page-tree.component';
 
 @Component({
@@ -174,13 +176,20 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
         }
 
         <div class="sidebar-footer">
-          <a routerLink="/settings" routerLinkActive="is-active" class="footer-link" (click)="closeOnMobile()">
-            <atr-icon name="settings" size="small" />
-            <span>Configuración</span>
+          <a routerLink="/settings/sync" routerLinkActive="is-active" class="footer-link" (click)="closeOnMobile()">
+            <atr-icon name="rotate-ccw" size="small" />
+            <span>Sincronización</span>
+            @if (sync.pendingCount() > 0) {
+              <span class="nav-badge">{{ sync.pendingCount() }}</span>
+            }
           </a>
           <a routerLink="/settings/storage" routerLinkActive="is-active" class="footer-link" (click)="closeOnMobile()">
             <atr-icon name="database" size="small" />
             <span>Almacenamiento</span>
+          </a>
+          <a routerLink="/settings" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }" class="footer-link" (click)="closeOnMobile()">
+            <atr-icon name="settings" size="small" />
+            <span>Configuración</span>
           </a>
         </div>
       </aside>
@@ -200,13 +209,30 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
                 <atr-icon name="menu" size="small" />
               </button>
             }
-            <span class="mode-dot" [class.is-remote]="auth.isRemoteApiEnabled">
+            <span class="mode-dot" [class.is-remote]="sync.isOnline()">
               <span class="dot"></span>
-              <span class="mode-text">{{ auth.isRemoteApiEnabled ? 'Cloudflare D1' : 'Local IndexedDB' }}</span>
+              <span class="mode-text">{{ sync.isOnline() ? 'Local-First' : 'Sin conexión' }}</span>
             </span>
+
+            @if (updater.status() === 'ready') {
+              <button atrButton type="button" size="small" appearance="outlined" (click)="updater.applyUpdateNow()">
+                Actualizar app
+              </button>
+            }
           </div>
 
           <div class="topbar-right">
+            <button
+              atrButton
+              type="button"
+              size="small"
+              appearance="outlined"
+              [loading]="sync.state() === 'syncing'"
+              (click)="triggerOneClickSync()"
+            >
+              Sincronizar@if (sync.pendingCount() > 0) { ({{ sync.pendingCount() }}) }
+            </button>
+
             <button
               atrIconButton
               type="button"
@@ -495,6 +521,16 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       text-decoration: none;
       font-size: 0.84rem;
 
+      .nav-badge {
+        margin-left: auto;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 0.08rem 0.42rem;
+        border-radius: 999px;
+        background: var(--trz-accent-soft);
+        color: var(--trz-accent);
+      }
+
       &:hover {
         background: var(--trz-bg-hover);
         color: var(--trz-text);
@@ -604,6 +640,8 @@ export class AppShellComponent implements OnInit {
   protected readonly store = inject(KnowledgeStore);
   protected readonly auth = inject(AuthService);
   protected readonly theme = inject(ThemeService);
+  protected readonly sync = inject(TrazenaSyncService);
+  protected readonly updater = inject(TrazenaUpdateService);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
   private readonly destroyRef = inject(DestroyRef);
@@ -710,6 +748,31 @@ export class AppShellComponent implements OnInit {
     this.snackbar.open({ message: `Página "${page.title}" creada.`, tone: 'success' });
     this.closeOnMobile();
     await this.router.navigateByUrl(path);
+  }
+
+  protected async triggerOneClickSync(): Promise<void> {
+    const res = await this.sync.syncNow();
+    if (!res) {
+      const msg = this.sync.lastError();
+      if (msg) this.snackbar.open({ message: msg, tone: 'info' });
+      return;
+    }
+    if (res.status === 'completed') {
+      this.snackbar.open({
+        message: `Sincronizado: ${res.uploaded.length} subidos, ${res.downloaded.length} descargados.`,
+        tone: 'success',
+      });
+    } else if (res.status === 'partial_conflict') {
+      this.snackbar.open({
+        message: `Hay ${res.conflictsCount} conflicto(s). Revísalos en Sincronización.`,
+        tone: 'warning',
+      });
+    } else {
+      this.snackbar.open({
+        message: res.errorMessage ?? 'Error al sincronizar.',
+        tone: 'error',
+      });
+    }
   }
 
   protected closeOnMobile(): void {

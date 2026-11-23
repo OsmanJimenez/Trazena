@@ -6,9 +6,6 @@ import {
 } from '@angular/router';
 import { authGuard, guestGuard } from './core/auth/auth.guards';
 
-/**
- * Matches arbitrary hierarchical depth under `/o/:orgSlug/:wsSlug/<pagePath...>`.
- */
 export const hierarchyPageMatcher: UrlMatcher = (
   segments: UrlSegment[],
 ): UrlMatchResult | null => {
@@ -28,6 +25,13 @@ export const hierarchyPageMatcher: UrlMatcher = (
 };
 
 export const routes: Routes = [
+  {
+    path: 'recovery',
+    loadComponent: () =>
+      import('./features/recovery/recovery-view.component').then(
+        (m) => m.RecoveryViewComponent,
+      ),
+  },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -64,10 +68,24 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'settings/sync',
+        loadComponent: () =>
+          import('./features/settings/sync-center.component').then(
+            (m) => m.SyncCenterComponent,
+          ),
+      },
+      {
         path: 'settings/storage',
         loadComponent: () =>
           import('./features/settings/storage-dashboard.component').then(
             (m) => m.StorageDashboardComponent,
+          ),
+      },
+      {
+        path: 'settings/updates',
+        loadComponent: () =>
+          import('./features/settings/updates-diagnostics.component').then(
+            (m) => m.UpdatesDiagnosticsComponent,
           ),
       },
       {

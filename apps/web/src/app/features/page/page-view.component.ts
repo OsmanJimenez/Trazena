@@ -16,6 +16,7 @@ import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { PageBreadcrumbsComponent } from './page-breadcrumbs.component';
 import { PageEditorComponent } from './page-editor.component';
+import { PageHistoryPanelComponent } from './page-history-panel.component';
 
 @Component({
   selector: 'trz-page-view',
@@ -28,6 +29,7 @@ import { PageEditorComponent } from './page-editor.component';
     AtralumeIcon,
     PageBreadcrumbsComponent,
     PageEditorComponent,
+    PageHistoryPanelComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -42,6 +44,9 @@ import { PageEditorComponent } from './page-editor.component';
           <div class="doc-header-bar">
             <trz-page-breadcrumbs [segments]="data.breadcrumbs" />
             <div class="doc-actions">
+              <button atrButton type="button" size="small" appearance="text" (click)="historyOpen.set(!historyOpen())">
+                Historial
+              </button>
               <button atrButton type="button" size="small" appearance="text" (click)="createSubpage()">
                 + Subpágina
               </button>
@@ -104,6 +109,15 @@ import { PageEditorComponent } from './page-editor.component';
                 </div>
               </div>
             </div>
+          }
+
+          @if (historyOpen()) {
+            <trz-page-history-panel
+              [pageId]="page.id"
+              [currentMarkdown]="page.content.markdown"
+              (closed)="historyOpen.set(false)"
+              (restored)="onHistoryRestored($event)"
+            />
           }
 
           <trz-page-editor
@@ -296,6 +310,7 @@ export class PageViewComponent {
   protected readonly notFound = signal(false);
   protected readonly titleDraft = signal('');
   protected readonly moveOpen = signal(false);
+  protected readonly historyOpen = signal(false);
   protected readonly moveTargetWsId = signal('');
   protected readonly moveTargetParentId = signal('');
 
@@ -459,5 +474,16 @@ export class PageViewComponent {
         content: { ...current.page.content, markdown: ev.markdown },
       },
     });
+  }
+
+  protected onHistoryRestored(ev: { revision: number; markdown: string }): void {
+    this.onContentSaved(ev);
+    const data = this.resolved();
+    if (data) {
+      // Force reload of editor content with restored snapshot
+      void this.router.navigateByUrl('/', { skipLocationChange: true }).then(() =>
+        this.router.navigateByUrl(data.canonicalPath),
+      );
+    }
   }
 }

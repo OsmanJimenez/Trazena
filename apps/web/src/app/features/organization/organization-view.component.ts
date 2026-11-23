@@ -210,7 +210,7 @@ export class OrganizationViewComponent {
 
   protected async deleteOrg(org: Organization): Promise<void> {
     if (!window.confirm(`¿Eliminar la organización "${org.name}"? Esta acción ocultará sus espacios y páginas.`)) return;
-    await this.store.deleteOrganization(org.id, false);
+    await this.store.deleteOrganization(org.id);
     this.snackbar.open({ message: 'Organización eliminada.', tone: 'warning' });
     await this.router.navigate(['/']);
   }

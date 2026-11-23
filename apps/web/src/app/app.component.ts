@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/cor
 import { RouterOutlet } from '@angular/router';
 import { TuiRoot } from '@taiga-ui/core';
 import { ThemeService } from './core/state/theme.service';
+import { TrazenaUpdateService } from './core/update/trazena-update.service';
 
 @Component({
   selector: 'trz-root',
@@ -16,8 +17,10 @@ import { ThemeService } from './core/state/theme.service';
 })
 export class AppComponent implements OnInit {
   private readonly theme = inject(ThemeService);
+  private readonly updater = inject(TrazenaUpdateService);
 
   ngOnInit(): void {
     void this.theme.initialize();
+    this.updater.initialize();
   }
 }
