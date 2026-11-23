@@ -7,6 +7,7 @@ import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { AuthService } from '../../core/auth/auth.service';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { ThemeService } from '../../core/state/theme.service';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 import { SettingsNavComponent } from './settings-nav.component';
 
 @Component({
@@ -131,6 +132,7 @@ export class SettingsComponent {
   protected readonly store = inject(KnowledgeStore);
   protected readonly theme = inject(ThemeService);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   protected readonly themes: readonly { value: ThemePreference; label: string }[] = [
     { value: 'light', label: 'Claro' },
@@ -144,7 +146,13 @@ export class SettingsComponent {
   }
 
   protected async purge(pageId: string, title: string): Promise<void> {
-    if (!window.confirm(`¿Eliminar definitivamente "${title}"? Esta acción no se puede deshacer.`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminar definitivamente',
+      message: `¿Eliminar definitivamente "${title}"? Esta acción no se puede deshacer.`,
+      confirmText: 'Eliminar definitivo',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deletePage(pageId, true);
     this.snackbar.open({ message: 'Página eliminada definitivamente.', tone: 'warning' });
   }

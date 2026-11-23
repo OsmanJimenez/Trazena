@@ -28,6 +28,7 @@ import { common, createLowlight } from 'lowlight';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { KnowledgeStore, type SaveStatus } from '../../core/state/knowledge.store';
 import { TrazenaUpdateService } from '../../core/update/trazena-update.service';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 
 interface MarkdownStorage {
   markdown?: {
@@ -220,6 +221,7 @@ export class PageEditorComponent implements AfterViewInit {
 
   protected readonly store = inject(KnowledgeStore);
   private readonly updater = inject(TrazenaUpdateService);
+  private readonly dialogs = inject(TrazenaDialogsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly editorHost = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
 
@@ -346,10 +348,16 @@ export class PageEditorComponent implements AfterViewInit {
       .run();
   }
 
-  protected setLink(): void {
+  protected async setLink(): Promise<void> {
     if (!this.editor) return;
     const prev = (this.editor.getAttributes('link')['href'] as string | undefined) ?? '';
-    const url = window.prompt('URL del enlace:', prev || 'https://');
+    const url = await this.dialogs.prompt({
+      title: 'Insertar enlace',
+      label: 'URL de destino',
+      initialValue: prev || 'https://',
+      placeholder: 'https://ejemplo.com',
+      confirmText: 'Aplicar',
+    });
     if (url === null) return;
     if (!url.trim()) {
       this.editor.chain().focus().extendMarkRange('link').unsetLink().run();

@@ -9,6 +9,7 @@ import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 import { PageBreadcrumbsComponent } from '../page/page-breadcrumbs.component';
 
 @Component({
@@ -145,6 +146,7 @@ export class WorkspaceViewComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   private readonly orgSlug = signal('');
   private readonly wsSlug = signal('');
@@ -200,13 +202,18 @@ export class WorkspaceViewComponent {
   }
 
   protected async createRootPage(org: Organization, ws: Workspace): Promise<void> {
-    const title = window.prompt('Título de la nueva página:');
-    if (!title?.trim()) return;
+    const title = await this.dialogs.prompt({
+      title: 'Nueva página',
+      label: 'Título de la página',
+      placeholder: 'Ej. Introducción, Guía técnica…',
+      confirmText: 'Crear',
+    });
+    if (!title) return;
     const page = await this.store.createPage({
       organizationId: org.id,
       workspaceId: ws.id,
       parentId: null,
-      title: title.trim(),
+      title,
     });
     const path = this.store.getCanonicalPath(page.id);
     this.snackbar.open({ message: `Página "${page.title}" creada.`, tone: 'success' });
@@ -227,7 +234,13 @@ export class WorkspaceViewComponent {
   }
 
   protected async deleteWs(org: Organization, ws: Workspace): Promise<void> {
-    if (!window.confirm(`¿Eliminar el espacio "${ws.name}"?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminar espacio',
+      message: `¿Eliminar el espacio "${ws.name}"?`,
+      confirmText: 'Eliminar',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deleteWorkspace(ws.id);
     this.snackbar.open({ message: 'Espacio eliminado.', tone: 'warning' });
     await this.router.navigate(['/o', org.slug]);

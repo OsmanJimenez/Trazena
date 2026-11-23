@@ -44,4 +44,4 @@ npm run dev:api        # http://127.0.0.1:8787
    - Actualiza `database_id` y `FIREBASE_PROJECT_ID` en `apps/api/wrangler.toml`.
    - Ejecuta `npm run db:migrate:remote` y `npm --workspace=@trazena/api run deploy`.
 3. **GitHub Pages:** el workflow `.github/workflows/deploy-pages.yml` compila y despliega automáticamente.
-   - **Nota sobre GitHub Pages y rutas profundas:** GitHub Pages puede responder con código HTTP `404` al abrir directamente una ruta profunda (por ejemplo `/Trazena/o/nequi/paypal/arquitectura`) antes de que `public/404.html` e `index.html` restauren la ruta canónica mediante History API.
+   - **Nota sobre GitHub Pages y rutas profundas:** GitHub Pages puede responder con código HTTP `404` al abrir directamente una ruta profunda (por ejemplo `/Trazena/o/trazena/guia-de-uso/bienvenido-a-trazena`) antes de que `public/404.html` e `index.html` restauren la ruta canónica mediante History API.

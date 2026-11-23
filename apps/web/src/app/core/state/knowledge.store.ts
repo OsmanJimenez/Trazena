@@ -1153,12 +1153,12 @@ export class KnowledgeStore {
     const userId = this.ownerUid;
     const now = new Date().toISOString();
 
-    const orgNequi: Organization = {
-      id: 'org-nequi',
+    const orgTrazena: Organization = {
+      id: 'org-trazena',
       ownerId: userId,
-      name: 'Nequi',
-      slug: 'nequi',
-      description: 'Documentación técnica, arquitectura e integraciones financieras.',
+      name: 'Trazena',
+      slug: 'trazena',
+      description: 'Guía oficial, características y arquitectura Local-First de Trazena.',
       icon: 'layers',
       position: generatePosition(0),
       status: 'active',
@@ -1169,11 +1169,11 @@ export class KnowledgeStore {
     };
 
     const orgPersonal: Organization = {
-      id: 'org-proyectos',
+      id: 'org-personal',
       ownerId: userId,
-      name: 'Proyectos personales',
-      slug: 'proyectos-personales',
-      description: 'Design systems, productos propios y arquitectura personal.',
+      name: 'Personal',
+      slug: 'personal',
+      description: 'Espacio personal para notas rápidas, aprendizaje e ideas.',
       icon: 'folder',
       position: generatePosition(1),
       status: 'active',
@@ -1183,12 +1183,12 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const wsPaypal: Workspace = {
-      id: 'ws-paypal',
-      organizationId: orgNequi.id,
-      name: 'PayPal',
-      slug: 'paypal',
-      description: 'Integración PayPal: flujos OAuth, arquitectura y despliegues.',
+    const wsGuia: Workspace = {
+      id: 'ws-guia',
+      organizationId: orgTrazena.id,
+      name: 'Guía de uso',
+      slug: 'guia-de-uso',
+      description: 'Cómo organizar tu conocimiento, usar el editor Markdown y sincronizar.',
       icon: 'book',
       position: generatePosition(0),
       status: 'active',
@@ -1198,12 +1198,12 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const wsAtralume: Workspace = {
-      id: 'ws-atralume',
+    const wsNotas: Workspace = {
+      id: 'ws-notas',
       organizationId: orgPersonal.id,
-      name: 'Atralume',
-      slug: 'atralume',
-      description: 'Design system Angular + Taiga UI y guía de tokens DTCG.',
+      name: 'Notas',
+      slug: 'notas',
+      description: 'Apuntes personales, listas de tareas e ideas diarias.',
       icon: 'book',
       position: generatePosition(0),
       status: 'active',
@@ -1213,13 +1213,13 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const pageArq: Page = {
-      id: 'page-arquitectura',
-      organizationId: orgNequi.id,
-      workspaceId: wsPaypal.id,
+    const pageBienvenida: Page = {
+      id: 'page-bienvenida',
+      organizationId: orgTrazena.id,
+      workspaceId: wsGuia.id,
       parentId: null,
-      title: 'Arquitectura',
-      slug: 'arquitectura',
+      title: 'Bienvenido a Trazena',
+      slug: 'bienvenido-a-trazena',
       icon: 'file-text',
       position: generatePosition(0),
       revision: 1,
@@ -1230,13 +1230,13 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const pageFrontend: Page = {
-      id: 'page-frontend',
-      organizationId: orgNequi.id,
-      workspaceId: wsPaypal.id,
-      parentId: pageArq.id,
-      title: 'Frontend',
-      slug: 'frontend',
+    const pageEditor: Page = {
+      id: 'page-editor-markdown',
+      organizationId: orgTrazena.id,
+      workspaceId: wsGuia.id,
+      parentId: pageBienvenida.id,
+      title: 'Editor Markdown',
+      slug: 'editor-markdown',
       icon: 'file-text',
       position: generatePosition(0),
       revision: 1,
@@ -1247,13 +1247,13 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const pageBackend: Page = {
-      id: 'page-backend',
-      organizationId: orgNequi.id,
-      workspaceId: wsPaypal.id,
-      parentId: pageArq.id,
-      title: 'Backend',
-      slug: 'backend',
+    const pageSync: Page = {
+      id: 'page-sincronizacion',
+      organizationId: orgTrazena.id,
+      workspaceId: wsGuia.id,
+      parentId: pageBienvenida.id,
+      title: 'Sincronización e historial',
+      slug: 'sincronizacion-e-historial',
       icon: 'file-text',
       position: generatePosition(1),
       revision: 1,
@@ -1264,13 +1264,13 @@ export class KnowledgeStore {
       updatedBy: userId,
     };
 
-    const pageAtralumeIntro: Page = {
-      id: 'page-atralume-tokens',
+    const pagePrimeraNota: Page = {
+      id: 'page-primera-nota',
       organizationId: orgPersonal.id,
-      workspaceId: wsAtralume.id,
+      workspaceId: wsNotas.id,
       parentId: null,
-      title: 'Tokens y Temas',
-      slug: 'tokens-y-temas',
+      title: 'Ideas y pendientes',
+      slug: 'ideas-y-pendientes',
       icon: 'file-text',
       position: generatePosition(0),
       revision: 1,
@@ -1283,90 +1283,104 @@ export class KnowledgeStore {
 
     const contents: PageContent[] = [
       {
-        pageId: pageArq.id,
-        markdown: `# Arquitectura — Integración PayPal
+        pageId: pageBienvenida.id,
+        markdown: `# Bienvenido a Trazena
 
-Bienvenido a **Trazena**. Esta página demuestra la jerarquía recursiva de documentación técnica con arquitectura **Local-First**.
+**Trazena** es una plataforma **Local-First** de gestión del conocimiento y documentación jerárquica pensada para ser rápida, privada y operable sin conexión.
 
-## Principios clave
+## Jerarquía de organización
 
-- [x] Persistencia local offline-first en **IndexedDB** con Outbox atómica
+Organiza tu información sin límites artificiales de profundidad:
+
+- **Organizaciones:** contextos independientes (por ejemplo: trabajo, proyectos, personal).
+- **Espacios:** áreas temáticas dentro de cada organización.
+- **Páginas y subpáginas:** documentos Markdown recursivos con URLs legibles y breadcrumbs automáticos.
+
+## Características principales
+
+- [x] Persistencia **Local-First** en **IndexedDB** (trabaja sin Internet)
+- [x] Editor visual integrado estilo Notion con formato Markdown en vivo
 - [x] Sincronización manual incremental de un clic (**Trazena Sync**)
-- [x] Historial limitado de hasta 3 versiones anteriores por página
-- [ ] Conectar Firebase Authentication y Cloudflare D1 en producción
+- [x] Historial automático de hasta **3 versiones anteriores** por página
+- [x] Aplicación instalable (**PWA**) con actualizaciones seguras y diagnóstico local
 
-## Mapa de componentes
+## Arquitectura técnica
 
 | Capa | Tecnología | Responsabilidad |
 | --- | --- | --- |
-| Frontend | Angular 22 + Atralume + PWA | Interfaz offline, editor WYSIWYG y sincronización manual |
-| API | Cloudflare Workers + Hono | Autenticación JWT Web Crypto y protocolo push/pull |
-| Base de datos | Cloudflare D1 (SQLite) | Persistencia relacional, FTS5, eventos e historial |
+| Frontend | Angular 22 + Atralume + PWA | Interfaz offline, árbol recursivo y editor WYSIWYG |
+| API | Cloudflare Workers + Hono | Autenticación RS256 y protocolo incremental push/pull |
+| Base de datos | Cloudflare D1 (SQLite + FTS5) | Persistencia relacional, eventos e historial remoto |
 
-> Tip: Escribe directamente en Markdown (\`#\`, \`**negrita**\`, \`- [ ]\`, \`>\`, \`\`\` código) — todo se formatea en vivo en el mismo lienzo.
+> Tip: Escribe directamente usando sintaxis Markdown (\`#\`, \`**negrita**\`, \`- [ ]\`, \`>\`, \`\`\` código) y todo se formatea al instante en el mismo documento.
 `,
-        excerpt: 'Bienvenido a Trazena. Esta página demuestra la jerarquía recursiva de documentación técnica.',
-        wordCount: 110,
+        excerpt: 'Trazena es una plataforma Local-First de gestión del conocimiento y documentación jerárquica.',
+        wordCount: 155,
         updatedAt: now,
         updatedBy: userId,
       },
       {
-        pageId: pageFrontend.id,
-        markdown: `# Frontend
+        pageId: pageEditor.id,
+        markdown: `# Editor Markdown en vivo
 
-La capa de presentación utiliza **Angular Standalone**, **Signals**, **PWA** y **Atralume** sobre Taiga UI 5.
+El editor de Trazena combina escritura directa tipo Notion con almacenamiento limpio en **Markdown estándar**.
+
+## Atajos rápidos
+
+- \`# \`, \`## \`, \`### \` para encabezados.
+- \`**negrita**\`, \`_cursiva_\`, \`~~tachado~~\` y \`\\\`código en línea\\\`\`.
+- \`- [ ] \` para crear listas de tareas interactivas que puedes marcar con un clic.
+- \`Ctrl+S\` para guardar de inmediato (además del autoguardado automático en IndexedDB).
 
 \`\`\`typescript
-import { provideAtralume } from '@osmanjimenez/atralume';
-
-export const appConfig = {
-  providers: [provideAtralume()],
-};
+// Los bloques de código soportan resaltado de sintaxis automático
+export function saludar(nombre: string): string {
+  return \`Hola, \${nombre} — bienvenido a Trazena\`;
+}
 \`\`\`
 `,
-        excerpt: 'La capa de presentación utiliza Angular Standalone, Signals, PWA y Atralume.',
-        wordCount: 28,
+        excerpt: 'El editor de Trazena combina escritura directa tipo Notion con almacenamiento limpio en Markdown.',
+        wordCount: 78,
         updatedAt: now,
         updatedBy: userId,
       },
       {
-        pageId: pageBackend.id,
-        markdown: `# Backend Serverless
+        pageId: pageSync.id,
+        markdown: `# Sincronización manual e historial
 
-Cloudflare Workers + Hono valida cada Firebase ID Token mediante **Web Crypto API (RS256)** y sincroniza incrementalmente mediante \`sync_events\`.
+En Trazena **los documentos pertenecen al usuario**, no al estado de la conexión:
 
-\`\`\`sql
-SELECT sequence, entity_type, entity_id, operation
-FROM sync_events
-WHERE sequence > ?
-ORDER BY sequence ASC
-LIMIT 100;
-\`\`\`
+1. **Escritura local atómica:** cada cambio se guarda primero en IndexedDB junto con la Outbox consolidada.
+2. **Sincronización manual de un clic:** cuando quieras subir o descargar cambios entre dispositivos, presiona **Sincronizar** en la barra superior.
+3. **Historial por página:** cada modificación de contenido conserva hasta **3 snapshots anteriores completos**, con comparación visual línea a línea y restauración no destructiva.
+4. **Control de conflictos:** si dos dispositivos editan la misma página, Trazena conserva ambas versiones para que elijas cómo resolverlo sin sobrescribir nada silenciosamente.
 `,
-        excerpt: 'Cloudflare Workers + Hono valida cada Firebase ID Token mediante Web Crypto API (RS256).',
-        wordCount: 38,
+        excerpt: 'Escritura local atómica, sincronización manual incremental, historial de 3 versiones y resolución de conflictos.',
+        wordCount: 98,
         updatedAt: now,
         updatedBy: userId,
       },
       {
-        pageId: pageAtralumeIntro.id,
-        markdown: `# Atralume — Tokens y Temas
+        pageId: pagePrimeraNota.id,
+        markdown: `# Ideas y pendientes
 
-Atralume gestiona el tema mediante \`data-atr-theme="light | dark | system"\` y superficies mediante \`data-atr-surface="glass"\`.
+Usa este espacio para tomar notas rápidas, probar el editor y organizar tus tareas:
 
-- **Consistencia visual:** componentes reutilizables del design system.
-- **Accesibilidad:** contraste WCAG y navegación por teclado.
+- [x] Explorar el árbol jerárquico en el panel lateral
+- [ ] Crear una nueva organización o espacio propio
+- [ ] Probar el botón **Historial** después de editar una página
+- [ ] Alternar entre tema claro y oscuro desde la barra superior
 `,
-        excerpt: 'Atralume gestiona el tema mediante data-atr-theme y superficies mediante data-atr-surface.',
-        wordCount: 34,
+        excerpt: 'Usa este espacio para tomar notas rápidas, probar el editor y organizar tus tareas.',
+        wordCount: 52,
         updatedAt: now,
         updatedBy: userId,
       },
     ];
 
-    const orgs = [orgNequi, orgPersonal];
-    const wss = [wsPaypal, wsAtralume];
-    const pgs = [pageArq, pageFrontend, pageBackend, pageAtralumeIntro];
+    const orgs = [orgTrazena, orgPersonal];
+    const wss = [wsGuia, wsNotas];
+    const pgs = [pageBienvenida, pageEditor, pageSync, pagePrimeraNota];
 
     await this.idb.putMany('organizations', orgs);
     await this.idb.putMany('workspaces', wss);

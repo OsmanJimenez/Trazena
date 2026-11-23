@@ -14,6 +14,7 @@ import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 import { PageBreadcrumbsComponent } from './page-breadcrumbs.component';
 import { PageEditorComponent } from './page-editor.component';
 import { PageHistoryPanelComponent } from './page-history-panel.component';
@@ -244,13 +245,8 @@ import { PageHistoryPanelComponent } from './page-history-panel.component';
       }
 
       select {
-        height: 32px;
-        padding: 0 0.55rem;
-        border: 1px solid var(--trz-border-strong);
-        border-radius: 6px;
-        background: var(--trz-bg);
-        color: var(--trz-text);
-        font: inherit;
+        height: 34px;
+        min-width: 180px;
       }
     }
 
@@ -305,6 +301,7 @@ export class PageViewComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   protected readonly resolved = signal<ResolvedRouteResult | null>(null);
   protected readonly notFound = signal(false);
@@ -385,9 +382,14 @@ export class PageViewComponent {
   protected async renameSlug(): Promise<void> {
     const page = this.resolved()?.page;
     if (!page) return;
-    const next = window.prompt('Nuevo slug URL (la ruta anterior seguirá redirigiendo):', page.slug);
-    if (!next?.trim() || next.trim() === page.slug) return;
-    await this.store.updatePageMeta(page.id, { slug: next.trim() });
+    const next = await this.dialogs.prompt({
+      title: 'Editar ruta (slug)',
+      label: 'Nuevo slug URL (la ruta anterior seguirá redirigiendo)',
+      initialValue: page.slug,
+      confirmText: 'Actualizar',
+    });
+    if (!next || next === page.slug) return;
+    await this.store.updatePageMeta(page.id, { slug: next });
     const newPath = this.store.getCanonicalPath(page.id);
     this.snackbar.open({ message: 'Ruta actualizada con alias de redirección.', tone: 'success' });
     await this.router.navigateByUrl(newPath, { replaceUrl: true });
@@ -396,13 +398,18 @@ export class PageViewComponent {
   protected async createSubpage(): Promise<void> {
     const page = this.resolved()?.page;
     if (!page) return;
-    const title = window.prompt('Título de la subpágina:');
-    if (!title?.trim()) return;
+    const title = await this.dialogs.prompt({
+      title: 'Nueva subpágina',
+      label: 'Título de la subpágina',
+      placeholder: 'Ej. Detalles técnicos…',
+      confirmText: 'Crear',
+    });
+    if (!title) return;
     const created = await this.store.createPage({
       organizationId: page.organizationId,
       workspaceId: page.workspaceId,
       parentId: page.id,
-      title: title.trim(),
+      title,
     });
     const path = this.store.getCanonicalPath(created.id);
     this.snackbar.open({ message: `Subpágina "${created.title}" creada.`, tone: 'success' });
@@ -457,7 +464,13 @@ export class PageViewComponent {
   protected async trashPage(): Promise<void> {
     const data = this.resolved();
     if (!data?.page || !data.workspace) return;
-    if (!window.confirm(`¿Enviar "${data.page.title}" y sus subpáginas a la papelera?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Enviar a papelera',
+      message: `¿Enviar "${data.page.title}" y sus subpáginas a la papelera?`,
+      confirmText: 'Enviar a papelera',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deletePage(data.page.id, false);
     this.snackbar.open({ message: 'Página enviada a la papelera.', tone: 'warning' });
     await this.router.navigate(['/o', data.organization.slug, data.workspace.slug]);

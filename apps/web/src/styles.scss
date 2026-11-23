@@ -194,6 +194,48 @@ button[atrIconButton].atr-icon-button {
   }
 }
 
+/* Consistent accessible select styling with proper margins and chevron spacing */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.4rem 2rem 0.4rem 0.72rem;
+  border: 1px solid var(--trz-border-strong);
+  border-radius: var(--trz-radius-sm);
+  background-color: var(--trz-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23787873' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 14px 14px;
+  color: var(--trz-text);
+  font-family: var(--trz-font-sans);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+
+  &:focus {
+    border-color: var(--trz-accent);
+    box-shadow: 0 0 0 3px var(--trz-accent-soft);
+  }
+
+  option {
+    background: var(--trz-bg-elevated);
+    color: var(--trz-text);
+    padding: 0.45rem 0.75rem;
+  }
+}
+
+/* Atralume Dialog modal surface alignment */
+tui-dialog[data-appearance="atr-dialog"] {
+  background: var(--trz-bg-elevated) !important;
+  color: var(--trz-text) !important;
+  border: 1px solid var(--trz-border) !important;
+  border-radius: var(--trz-radius-lg) !important;
+  box-shadow: var(--trz-shadow-md) !important;
+  padding: 1.35rem 1.5rem !important;
+}
+
 /* --- Notion-style single-canvas Tiptap / ProseMirror document styles --- */
 .trz-notion-editor .ProseMirror {
   outline: none;

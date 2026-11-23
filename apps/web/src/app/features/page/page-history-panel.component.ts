@@ -18,6 +18,7 @@ import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 
 @Component({
   selector: 'trz-page-history-panel',
@@ -143,6 +144,7 @@ export class PageHistoryPanelComponent {
 
   private readonly store = inject(KnowledgeStore);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   protected readonly versions = signal<PageHistoryVersion[]>([]);
   protected readonly selected = signal<PageHistoryVersion | null>(null);
@@ -187,7 +189,13 @@ export class PageHistoryPanelComponent {
   }
 
   protected async remove(v: PageHistoryVersion): Promise<void> {
-    if (!window.confirm(`¿Eliminar la versión histórica v${v.revision}?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminar versión histórica',
+      message: `¿Eliminar la versión histórica v${v.revision}? La versión actual no se verá afectada.`,
+      confirmText: 'Eliminar',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deleteHistoryVersion(v.id);
     this.snackbar.open({ message: 'Versión histórica eliminada.', tone: 'info' });
     await this.load(this.pageId());

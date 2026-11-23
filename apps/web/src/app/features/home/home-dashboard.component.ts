@@ -6,6 +6,7 @@ import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 
 @Component({
   selector: 'trz-home-dashboard',
@@ -227,6 +228,7 @@ export class HomeDashboardComponent {
   protected readonly store = inject(KnowledgeStore);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   protected readonly recentPages = computed(() =>
     [...this.store.pages()]
@@ -236,9 +238,14 @@ export class HomeDashboardComponent {
   );
 
   protected async createOrg(): Promise<void> {
-    const name = window.prompt('Nombre de la organización:');
-    if (!name?.trim()) return;
-    const org = await this.store.createOrganization({ name: name.trim() });
+    const name = await this.dialogs.prompt({
+      title: 'Nueva organización',
+      label: 'Nombre de la organización',
+      placeholder: 'Ej. Trabajo, Proyectos personales…',
+      confirmText: 'Crear',
+    });
+    if (!name) return;
+    const org = await this.store.createOrganization({ name });
     this.snackbar.open({ message: `Organización "${org.name}" creada.`, tone: 'success' });
     await this.router.navigate(['/o', org.slug]);
   }

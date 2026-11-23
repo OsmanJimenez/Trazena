@@ -9,6 +9,7 @@ import {
   KnowledgeStore,
   type DetailedStorageMetrics,
 } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 import { SettingsNavComponent } from './settings-nav.component';
 
 @Component({
@@ -177,8 +178,7 @@ import { SettingsNavComponent } from './settings-nav.component';
     .filters {
       display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
       select {
-        height: 30px; padding: 0 0.55rem; border: 1px solid var(--trz-border-strong);
-        border-radius: 6px; background: var(--trz-bg); color: var(--trz-text); font: inherit; font-size: 0.82rem;
+        height: 34px;
       }
     }
     .old-toggle { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--trz-text-muted); }
@@ -200,6 +200,7 @@ import { SettingsNavComponent } from './settings-nav.component';
 export class StorageDashboardComponent implements OnInit {
   protected readonly store = inject(KnowledgeStore);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   protected readonly metrics = signal<DetailedStorageMetrics | null>(null);
   protected readonly allHistory = signal<PageHistoryVersion[]>([]);
@@ -255,7 +256,13 @@ export class StorageDashboardComponent implements OnInit {
   }
 
   protected async deleteSingle(v: PageHistoryVersion): Promise<void> {
-    if (!window.confirm('¿Eliminar esta versión histórica? La versión actual de la página no se verá afectada.')) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminar versión histórica',
+      message: '¿Eliminar esta versión histórica? La versión actual de la página no se verá afectada.',
+      confirmText: 'Eliminar',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deleteHistoryVersion(v.id);
     this.snackbar.open({ message: 'Versión histórica eliminada.', tone: 'info' });
     await this.reload();
@@ -264,7 +271,13 @@ export class StorageDashboardComponent implements OnInit {
   protected async bulkDelete(): Promise<void> {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
-    if (!window.confirm(`¿Eliminar ${ids.length} versión(es) histórica(s) seleccionada(s)?`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminación por lotes',
+      message: `¿Eliminar ${ids.length} versión(es) histórica(s) seleccionada(s)? Esta acción no afecta las versiones actuales.`,
+      confirmText: `Eliminar (${ids.length})`,
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deleteHistoryVersionsBulk(ids);
     this.selectedIds.set(new Set());
     this.snackbar.open({ message: `${ids.length} versiones eliminadas.`, tone: 'warning' });

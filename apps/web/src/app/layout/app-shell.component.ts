@@ -19,6 +19,7 @@ import { KnowledgeStore } from '../core/state/knowledge.store';
 import { ThemeService } from '../core/state/theme.service';
 import { TrazenaSyncService } from '../core/sync/trazena-sync.service';
 import { TrazenaUpdateService } from '../core/update/trazena-update.service';
+import { TrazenaDialogsService } from '../core/ui/trazena-dialogs.service';
 import { PageTreeComponent } from '../features/page/page-tree.component';
 
 @Component({
@@ -238,11 +239,11 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
               type="button"
               appearance="standard"
               size="small"
-              [title]="'Tema: ' + theme.theme()"
+              [title]="theme.effectiveTheme() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
               aria-label="Cambiar tema"
-              (click)="theme.cycleTheme()"
+              (click)="theme.toggleTheme()"
             >
-              <atr-icon [name]="theme.theme() === 'dark' ? 'moon' : 'sun'" size="small" />
+              <atr-icon [name]="theme.effectiveTheme() === 'dark' ? 'sun' : 'moon'" size="small" />
             </button>
 
             <span class="user-badge" [title]="auth.user()?.email || ''">
@@ -349,21 +350,8 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
     .org-select {
       flex: 1;
       min-width: 0;
-      height: 32px;
-      padding: 0 0.55rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-sm);
-      background: var(--trz-bg);
-      color: var(--trz-text);
-      font: inherit;
-      font-size: 0.84rem;
+      height: 34px;
       font-weight: 600;
-      outline: none;
-      cursor: pointer;
-
-      &:focus {
-        border-color: var(--trz-border-strong);
-      }
     }
 
     .search-box {
@@ -644,6 +632,7 @@ export class AppShellComponent implements OnInit {
   protected readonly updater = inject(TrazenaUpdateService);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly isMobile = signal(
@@ -705,9 +694,14 @@ export class AppShellComponent implements OnInit {
   }
 
   protected async quickCreateOrg(): Promise<void> {
-    const name = window.prompt('Nombre de la nueva organización:');
-    if (!name?.trim()) return;
-    const org = await this.store.createOrganization({ name: name.trim() });
+    const name = await this.dialogs.prompt({
+      title: 'Nueva organización',
+      label: 'Nombre de la organización',
+      placeholder: 'Ej. Trabajo, Proyectos personales…',
+      confirmText: 'Crear',
+    });
+    if (!name) return;
+    const org = await this.store.createOrganization({ name });
     this.selectedOrgId.set(org.id);
     this.snackbar.open({ message: `Organización "${org.name}" creada.`, tone: 'success' });
     this.closeOnMobile();
@@ -715,11 +709,16 @@ export class AppShellComponent implements OnInit {
   }
 
   protected async quickCreateWorkspace(orgId: string): Promise<void> {
-    const name = window.prompt('Nombre del nuevo espacio:');
-    if (!name?.trim()) return;
+    const name = await this.dialogs.prompt({
+      title: 'Nuevo espacio',
+      label: 'Nombre del espacio',
+      placeholder: 'Ej. Guía de uso, Notas, Finanzas…',
+      confirmText: 'Crear',
+    });
+    if (!name) return;
     const ws = await this.store.createWorkspace({
       organizationId: orgId,
-      name: name.trim(),
+      name,
     });
     const org = this.store.activeOrganizations().find((o) => o.id === orgId);
     this.snackbar.open({ message: `Espacio "${ws.name}" creado.`, tone: 'success' });
@@ -734,15 +733,18 @@ export class AppShellComponent implements OnInit {
     wsId: string,
     parentId: string | null,
   ): Promise<void> {
-    const title = window.prompt(
-      parentId ? 'Título de la nueva subpágina:' : 'Título de la nueva página:',
-    );
-    if (!title?.trim()) return;
+    const title = await this.dialogs.prompt({
+      title: parentId ? 'Nueva subpágina' : 'Nueva página',
+      label: 'Título de la página',
+      placeholder: 'Ej. Arquitectura, Despliegues…',
+      confirmText: 'Crear',
+    });
+    if (!title) return;
     const page = await this.store.createPage({
       organizationId: orgId,
       workspaceId: wsId,
       parentId,
-      title: title.trim(),
+      title,
     });
     const path = this.store.getCanonicalPath(page.id);
     this.snackbar.open({ message: `Página "${page.title}" creada.`, tone: 'success' });

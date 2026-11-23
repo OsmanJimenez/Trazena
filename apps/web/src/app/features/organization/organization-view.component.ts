@@ -9,6 +9,7 @@ import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
+import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 
 @Component({
   selector: 'trz-organization-view',
@@ -144,6 +145,7 @@ export class OrganizationViewComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly dialogs = inject(TrazenaDialogsService);
 
   private readonly slug = signal('');
   protected readonly editing = signal(false);
@@ -189,9 +191,14 @@ export class OrganizationViewComponent {
   }
 
   protected async createWorkspace(org: Organization): Promise<void> {
-    const name = window.prompt('Nombre del nuevo espacio:');
-    if (!name?.trim()) return;
-    const ws = await this.store.createWorkspace({ organizationId: org.id, name: name.trim() });
+    const name = await this.dialogs.prompt({
+      title: 'Nuevo espacio',
+      label: 'Nombre del espacio',
+      placeholder: 'Ej. Documentación, Arquitectura…',
+      confirmText: 'Crear',
+    });
+    if (!name) return;
+    const ws = await this.store.createWorkspace({ organizationId: org.id, name });
     this.snackbar.open({ message: `Espacio "${ws.name}" creado.`, tone: 'success' });
     await this.router.navigate(['/o', org.slug, ws.slug]);
   }
@@ -209,7 +216,13 @@ export class OrganizationViewComponent {
   }
 
   protected async deleteOrg(org: Organization): Promise<void> {
-    if (!window.confirm(`¿Eliminar la organización "${org.name}"? Esta acción ocultará sus espacios y páginas.`)) return;
+    const ok = await this.dialogs.confirm({
+      title: 'Eliminar organización',
+      message: `¿Eliminar "${org.name}"? Esta acción ocultará sus espacios y páginas.`,
+      confirmText: 'Eliminar',
+      danger: true,
+    });
+    if (!ok) return;
     await this.store.deleteOrganization(org.id);
     this.snackbar.open({ message: 'Organización eliminada.', tone: 'warning' });
     await this.router.navigate(['/']);
