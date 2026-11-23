@@ -31,14 +31,18 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
             @for (org of store.activeOrganizations(); track org.id) {
               <a class="card-link" [routerLink]="['/o', org.slug]">
                 <atr-card appearance="outlined" class="org-card">
-                  <div class="org-card-top">
-                    <atr-icon [name]="org.icon || 'folder'" size="medium" />
-                    <h3>{{ org.name }}</h3>
+                  <div class="card-inner">
+                    <div class="org-card-top">
+                      <span class="org-icon">
+                        <atr-icon [name]="org.icon || 'folder'" size="small" />
+                      </span>
+                      <h3>{{ org.name }}</h3>
+                    </div>
+                    <p class="org-desc">{{ org.description || 'Sin descripción' }}</p>
+                    <span class="org-meta">
+                      {{ store.getWorkspacesForOrg(org.id).length }} espacio(s) · /o/{{ org.slug }}
+                    </span>
                   </div>
-                  <p class="org-desc">{{ org.description || 'Sin descripción' }}</p>
-                  <span class="org-meta">
-                    {{ store.getWorkspacesForOrg(org.id).length }} espacios · /o/{{ org.slug }}
-                  </span>
                 </atr-card>
               </a>
             }
@@ -71,7 +75,7 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
   `,
   styles: `
     .dashboard {
-      max-width: 1080px;
+      max-width: 920px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -81,79 +85,97 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
     .dash-header {
       display: flex;
       flex-wrap: wrap;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 1rem;
 
       h1 {
         margin: 0;
-        font-size: 1.75rem;
-        letter-spacing: -0.025em;
+        font-size: clamp(1.45rem, 2.5vw, 1.85rem);
+        font-weight: 750;
+        letter-spacing: -0.03em;
       }
 
       p {
         margin: 0.35rem 0 0;
         color: var(--trz-text-muted);
+        font-size: 0.92rem;
       }
     }
 
     .section h2 {
-      font-size: 0.85rem;
+      font-size: 0.74rem;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       color: var(--trz-text-subtle);
-      margin: 0 0 0.9rem;
+      margin: 0 0 0.85rem;
     }
 
     .cards-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 0.9rem;
     }
 
     .card-link {
       text-decoration: none;
       color: inherit;
+      display: block;
     }
 
     .org-card {
-      padding: 1.15rem 1.25rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
       height: 100%;
       transition: border-color 140ms ease, transform 140ms ease;
 
       &:hover {
-        border-color: var(--trz-accent);
+        border-color: var(--trz-border-strong) !important;
         transform: translateY(-1px);
       }
+    }
+
+    .card-inner {
+      padding: 1.15rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      height: 100%;
     }
 
     .org-card-top {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.65rem;
 
       h3 {
         margin: 0;
-        font-size: 1.05rem;
+        font-size: 1.02rem;
+        font-weight: 650;
+        letter-spacing: -0.015em;
       }
+    }
+
+    .org-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--trz-bg-subtle);
+      color: var(--trz-text);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
     }
 
     .org-desc {
       margin: 0;
-      font-size: 0.86rem;
+      font-size: 0.85rem;
       color: var(--trz-text-muted);
-      line-height: 1.45;
+      line-height: 1.5;
       flex: 1;
     }
 
     .org-meta {
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       color: var(--trz-text-subtle);
       font-family: var(--trz-font-mono);
     }
@@ -172,14 +194,15 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.7rem 1rem;
+      gap: 0.45rem 1rem;
+      padding: 0.72rem 1rem;
       text-decoration: none;
       color: var(--trz-text);
       border-bottom: 1px solid var(--trz-border);
+      transition: background 120ms ease;
 
       &:last-child { border-bottom: 0; }
-      &:hover { background: var(--trz-bg-hover); }
+      &:hover { background: var(--trz-bg-subtle); }
     }
 
     .recent-left {
@@ -187,13 +210,16 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
       align-items: center;
       gap: 0.55rem;
       font-weight: 500;
-      font-size: 0.92rem;
+      font-size: 0.9rem;
     }
 
     .recent-path {
       font-family: var(--trz-font-mono);
-      font-size: 0.76rem;
+      font-size: 0.74rem;
       color: var(--trz-text-subtle);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
   `,
 })

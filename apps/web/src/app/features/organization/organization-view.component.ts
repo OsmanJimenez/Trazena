@@ -41,25 +41,27 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
         </header>
 
         @if (editing()) {
-          <atr-card appearance="outlined" class="edit-card">
-            <h3>Propiedades de la organización</h3>
-            <div class="form-grid">
-              <label>
-                <span>Nombre</span>
-                <input type="text" [(ngModel)]="editName" />
-              </label>
-              <label>
-                <span>Slug</span>
-                <input type="text" [(ngModel)]="editSlug" />
-              </label>
-              <label class="full">
-                <span>Descripción</span>
-                <textarea rows="2" [(ngModel)]="editDescription"></textarea>
-              </label>
-            </div>
-            <div class="form-actions">
-              <button atrButton type="button" size="small" (click)="saveOrg(org)">Guardar cambios</button>
-              <button atrButton type="button" size="small" appearance="text" (click)="editing.set(false)">Cancelar</button>
+          <atr-card appearance="outlined">
+            <div class="card-inner">
+              <h3>Propiedades de la organización</h3>
+              <div class="form-grid">
+                <label>
+                  <span>Nombre</span>
+                  <input type="text" [(ngModel)]="editName" />
+                </label>
+                <label>
+                  <span>Slug</span>
+                  <input type="text" [(ngModel)]="editSlug" />
+                </label>
+                <label class="full">
+                  <span>Descripción</span>
+                  <textarea rows="2" [(ngModel)]="editDescription"></textarea>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button atrButton type="button" size="small" (click)="saveOrg(org)">Guardar cambios</button>
+                <button atrButton type="button" size="small" appearance="text" (click)="editing.set(false)">Cancelar</button>
+              </div>
             </div>
           </atr-card>
         }
@@ -71,12 +73,14 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
               @for (ws of workspaces(); track ws.id) {
                 <a class="ws-card-link" [routerLink]="['/o', org.slug, ws.slug]">
                   <atr-card appearance="outlined" class="ws-card">
-                    <div class="ws-top">
-                      <atr-icon [name]="ws.icon || 'book'" size="small" />
-                      <h3>{{ ws.name }}</h3>
+                    <div class="card-inner">
+                      <div class="ws-top">
+                        <atr-icon [name]="ws.icon || 'book'" size="small" />
+                        <h3>{{ ws.name }}</h3>
+                      </div>
+                      <p>{{ ws.description || 'Espacio de documentación.' }}</p>
+                      <span class="meta">{{ store.getPagesForWorkspace(ws.id).length }} página(s)</span>
                     </div>
-                    <p>{{ ws.description || 'Espacio de documentación.' }}</p>
-                    <span class="meta">{{ store.getPagesForWorkspace(ws.id).length }} páginas</span>
                   </atr-card>
                 </a>
               }
@@ -94,31 +98,26 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
     }
   `,
   styles: `
-    .org-view { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+    .org-view { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.65rem; }
     .view-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-    .eyebrow { font-size: 0.78rem; font-family: var(--trz-font-mono); color: var(--trz-text-subtle); }
-    h1 { margin: 0.25rem 0 0; font-size: 1.8rem; }
-    .desc { margin: 0.4rem 0 0; color: var(--trz-text-muted); }
+    .eyebrow { font-size: 0.76rem; font-family: var(--trz-font-mono); color: var(--trz-text-subtle); }
+    h1 { margin: 0.2rem 0 0; font-size: clamp(1.5rem, 2.5vw, 1.9rem); letter-spacing: -0.025em; }
+    .desc { margin: 0.35rem 0 0; color: var(--trz-text-muted); font-size: 0.92rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-    .edit-card {
-      padding: 1.15rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
+    .card-inner {
+      padding: 1.15rem 1.25rem;
+      display: flex; flex-direction: column; gap: 0.85rem;
       h3 { margin: 0; font-size: 1rem; }
     }
     .form-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 0.85rem;
       label {
-        display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.84rem;
+        display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.82rem; font-weight: 500;
         &.full { grid-column: 1 / -1; }
         input, textarea {
-          padding: 0.55rem 0.7rem;
+          padding: 0.55rem 0.75rem;
           border: 1px solid var(--trz-border-strong);
           border-radius: 6px;
           background: var(--trz-bg);
@@ -127,21 +126,17 @@ import { KnowledgeStore } from '../../core/state/knowledge.store';
         }
       }
     }
-    .form-actions { display: flex; gap: 0.5rem; }
-    h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--trz-text-subtle); margin: 0 0 0.85rem; }
+    .form-actions { display: flex; gap: 0.45rem; }
+    h2 { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--trz-text-subtle); margin: 0 0 0.85rem; }
     .ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.9rem; }
-    .ws-card-link { text-decoration: none; color: inherit; }
+    .ws-card-link { text-decoration: none; color: inherit; display: block; }
     .ws-card {
-      padding: 1.05rem 1.15rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
-      display: flex; flex-direction: column; gap: 0.45rem;
-      &:hover { border-color: var(--trz-accent); }
-      p { margin: 0; font-size: 0.85rem; color: var(--trz-text-muted); }
+      height: 100%;
+      &:hover { border-color: var(--trz-border-strong) !important; }
+      p { margin: 0; font-size: 0.85rem; color: var(--trz-text-muted); line-height: 1.45; }
     }
     .ws-top { display: flex; align-items: center; gap: 0.5rem; h3 { margin: 0; font-size: 1rem; } }
-    .meta { font-size: 0.76rem; color: var(--trz-text-subtle); }
+    .meta { font-size: 0.74rem; color: var(--trz-text-subtle); font-family: var(--trz-font-mono); }
   `,
 })
 export class OrganizationViewComponent {

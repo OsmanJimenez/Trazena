@@ -14,119 +14,182 @@ import { AuthService } from '../../core/auth/auth.service';
   template: `
     <main class="auth-page">
       <atr-card appearance="elevated" class="auth-card">
-        <div>
-          <h1>Recuperar contraseña</h1>
-          <p class="auth-subtitle">
-            Te enviaremos un enlace de restablecimiento a tu correo registrado en Firebase.
-          </p>
-        </div>
-
-        @if (sent()) {
-          <div class="auth-success" role="status">
-            <atr-icon name="check" size="small" />
-            <span>Revisa tu bandeja de entrada para restablecer tu contraseña.</span>
+        <div class="auth-inner">
+          <div class="auth-brand">
+            <div class="auth-logo">T</div>
+            <div>
+              <h1>Recuperar contraseña</h1>
+              <p class="auth-subtitle">Recibirás un enlace de restablecimiento en tu correo.</p>
+            </div>
           </div>
-        } @else {
-          <form class="auth-form" (ngSubmit)="submit()">
-            <label class="field">
-              <span>Correo electrónico</span>
-              <input
-                type="email"
-                name="email"
-                required
-                [(ngModel)]="email"
-                placeholder="tu@correo.com"
-              />
-            </label>
 
-            @if (errorMessage()) {
-              <div class="auth-error" role="alert">
-                <atr-icon name="warning" size="small" />
-                <span>{{ errorMessage() }}</span>
-              </div>
-            }
+          @if (sent()) {
+            <div class="auth-success" role="status">
+              <atr-icon name="check" size="small" />
+              <span>Revisa tu bandeja de entrada para restablecer tu contraseña.</span>
+            </div>
+          } @else {
+            <form class="auth-form" (ngSubmit)="submit()">
+              <label class="field">
+                <span>Correo electrónico</span>
+                <input
+                  type="email"
+                  name="email"
+                  required
+                  [(ngModel)]="email"
+                  placeholder="nombre@dominio.com"
+                />
+              </label>
 
-            <button
-              atrButton
-              type="submit"
-              appearance="filled"
-              [fullWidth]="true"
-              [loading]="submitting()"
-            >
-              Enviar enlace de recuperación
-            </button>
-          </form>
-        }
+              @if (errorMessage()) {
+                <div class="auth-error" role="alert">
+                  <atr-icon name="warning" size="small" />
+                  <span>{{ errorMessage() }}</span>
+                </div>
+              }
 
-        <div class="auth-footer">
-          <a routerLink="/login">Volver a iniciar sesión</a>
+              <button
+                atrButton
+                type="submit"
+                appearance="filled"
+                [fullWidth]="true"
+                [loading]="submitting()"
+              >
+                Enviar enlace de recuperación
+              </button>
+            </form>
+          }
+
+          <div class="auth-footer">
+            <a routerLink="/login">← Volver a iniciar sesión</a>
+          </div>
         </div>
       </atr-card>
     </main>
   `,
   styles: `
     .auth-page {
-      min-height: 100vh;
+      min-height: 100dvh;
       display: grid;
       place-items: center;
-      padding: 1.5rem;
-      background: var(--trz-bg);
+      padding: 1.5rem 1rem;
+      background:
+        radial-gradient(600px circle at 50% 0%, var(--trz-accent-soft), transparent 65%),
+        var(--trz-bg-sidebar);
     }
+
     .auth-card {
       width: 100%;
-      max-width: 420px;
-      padding: 2rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-lg);
-      background: var(--trz-bg-elevated);
+      max-width: 400px;
+      box-shadow: var(--trz-shadow-md) !important;
+    }
+
+    .auth-inner {
+      padding: 2rem 1.75rem;
       display: flex;
       flex-direction: column;
-      gap: 1.25rem;
+      gap: 1.35rem;
     }
-    h1 { margin: 0; font-size: 1.3rem; }
-    .auth-subtitle { margin: 0.35rem 0 0; color: var(--trz-text-muted); font-size: 0.875rem; line-height: 1.45; }
-    .auth-form { display: flex; flex-direction: column; gap: 1rem; }
+
+    .auth-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .auth-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--trz-text);
+      color: var(--trz-bg);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 1.15rem;
+      flex-shrink: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .auth-subtitle {
+      margin: 0.2rem 0 0;
+      color: var(--trz-text-muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.95rem;
+    }
+
     .field {
       display: flex;
       flex-direction: column;
-      gap: 0.4rem;
-      font-size: 0.85rem;
+      gap: 0.35rem;
+      font-size: 0.82rem;
       font-weight: 500;
+
       input {
-        padding: 0.65rem 0.8rem;
+        width: 100%;
+        padding: 0.62rem 0.8rem;
         border: 1px solid var(--trz-border-strong);
         border-radius: var(--trz-radius-sm);
         background: var(--trz-bg);
         color: var(--trz-text);
         font: inherit;
+        font-size: 0.9rem;
+        outline: none;
+
+        &:focus {
+          border-color: var(--trz-accent);
+          box-shadow: 0 0 0 3px var(--trz-accent-soft);
+        }
       }
     }
+
     .auth-error {
       display: flex;
       align-items: flex-start;
       gap: 0.5rem;
       padding: 0.7rem 0.85rem;
       border-radius: var(--trz-radius-sm);
-      background: color-mix(in srgb, var(--trz-danger) 12%, transparent);
+      background: color-mix(in srgb, var(--trz-danger) 10%, transparent);
       color: var(--trz-danger);
       font-size: 0.82rem;
       line-height: 1.4;
     }
+
     .auth-success {
       display: flex;
       align-items: center;
       gap: 0.5rem;
       padding: 0.75rem 0.9rem;
       border-radius: var(--trz-radius-sm);
-      background: color-mix(in srgb, var(--trz-success) 14%, transparent);
+      background: color-mix(in srgb, var(--trz-success) 12%, transparent);
       color: var(--trz-success);
       font-size: 0.85rem;
     }
+
     .auth-footer {
       text-align: center;
-      font-size: 0.85rem;
-      a { color: var(--trz-accent); text-decoration: none; }
-      a:hover { text-decoration: underline; }
+      padding-top: 0.4rem;
+      border-top: 1px solid var(--trz-border);
+      font-size: 0.84rem;
+
+      a {
+        color: var(--trz-accent);
+        text-decoration: none;
+        font-weight: 500;
+        &:hover { text-decoration: underline; }
+      }
     }
   `,
 })

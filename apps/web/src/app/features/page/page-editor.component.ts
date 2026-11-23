@@ -1,4 +1,5 @@
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -11,54 +12,62 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableHeader from '@tiptap/extension-table-header';
+import TableCell from '@tiptap/extension-table-cell';
+import Link from '@tiptap/extension-link';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { Markdown } from 'tiptap-markdown';
+import { common, createLowlight } from 'lowlight';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
-import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeStore, type SaveStatus } from '../../core/state/knowledge.store';
-import { renderSafeMarkdown } from '../../core/utils/markdown.util';
 
-type EditorMode = 'edit' | 'split' | 'preview';
+interface MarkdownStorage {
+  markdown?: {
+    getMarkdown(): string;
+  };
+}
+
+const lowlight = createLowlight(common);
 
 @Component({
   selector: 'trz-page-editor',
   standalone: true,
-  imports: [FormsModule, AtralumeButton, AtralumeIcon],
+  imports: [AtralumeButton, AtralumeIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="editor-shell">
-      <div class="editor-toolbar" role="toolbar" aria-label="Formato Markdown">
-        <div class="toolbar-group">
-          <button type="button" class="tb-btn" title="Título H1" (click)="prefixLine('# ')">H1</button>
-          <button type="button" class="tb-btn" title="Título H2" (click)="prefixLine('## ')">H2</button>
-          <button type="button" class="tb-btn" title="Título H3" (click)="prefixLine('### ')">H3</button>
-          <span class="tb-sep"></span>
-          <button type="button" class="tb-btn" title="Negrita (Ctrl+B)" (click)="wrapSelection('**', '**', 'texto')"><strong>B</strong></button>
-          <button type="button" class="tb-btn" title="Cursiva (Ctrl+I)" (click)="wrapSelection('_', '_', 'texto')"><em>I</em></button>
-          <button type="button" class="tb-btn" title="Tachado" (click)="wrapSelection('~~', '~~', 'texto')"><s>S</s></button>
-          <button type="button" class="tb-btn" title="Código en línea" (click)="wrapSelection('\`', '\`', 'codigo')"><code>&lt;/&gt;</code></button>
-          <span class="tb-sep"></span>
-          <button type="button" class="tb-btn" title="Lista" (click)="prefixLine('- ')">• Lista</button>
-          <button type="button" class="tb-btn" title="Checklist" (click)="prefixLine('- [ ] ')">☑ Tarea</button>
-          <button type="button" class="tb-btn" title="Cita" (click)="prefixLine('> ')">❝</button>
-          <button type="button" class="tb-btn" title="Enlace (Ctrl+K)" (click)="insertLink()">🔗</button>
-          <button type="button" class="tb-btn" title="Bloque de código" (click)="insertCodeBlock()">Bloque</button>
-          <button type="button" class="tb-btn" title="Tabla" (click)="insertTable()">Tabla</button>
-          <button type="button" class="tb-btn" title="Separador" (click)="insertBlock('\n---\n')">―</button>
+    <section class="notion-editor-shell">
+      <div class="editor-bar" role="toolbar" aria-label="Formato del documento">
+        <div class="bar-controls">
+          <button type="button" class="fmt-btn" [class.active]="isActive('heading', { level: 1 })" title="Título 1 (# )" (click)="toggleHeading(1)">H1</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('heading', { level: 2 })" title="Título 2 (## )" (click)="toggleHeading(2)">H2</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('heading', { level: 3 })" title="Título 3 (### )" (click)="toggleHeading(3)">H3</button>
+          <span class="bar-sep"></span>
+          <button type="button" class="fmt-btn" [class.active]="isActive('bold')" title="Negrita (Ctrl+B)" (click)="cmd('toggleBold')"><strong>B</strong></button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('italic')" title="Cursiva (Ctrl+I)" (click)="cmd('toggleItalic')"><em>I</em></button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('strike')" title="Tachado" (click)="cmd('toggleStrike')"><s>S</s></button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('code')" title="Código en línea" (click)="cmd('toggleCode')"><code>&lt;/&gt;</code></button>
+          <span class="bar-sep"></span>
+          <button type="button" class="fmt-btn" [class.active]="isActive('bulletList')" title="Lista con viñetas" (click)="cmd('toggleBulletList')">• Lista</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('orderedList')" title="Lista numerada" (click)="cmd('toggleOrderedList')">1. Lista</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('taskList')" title="Checklist interactivo" (click)="cmd('toggleTaskList')">☑ Tarea</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('blockquote')" title="Cita" (click)="cmd('toggleBlockquote')">❝</button>
+          <button type="button" class="fmt-btn" [class.active]="isActive('codeBlock')" title="Bloque de código" (click)="cmd('toggleCodeBlock')">Código</button>
+          <button type="button" class="fmt-btn" title="Insertar tabla" (click)="insertTable()">Tabla</button>
+          <button type="button" class="fmt-btn" title="Insertar enlace" (click)="setLink()">Enlace</button>
+          <button type="button" class="fmt-btn" title="Separador" (click)="cmd('setHorizontalRule')">―</button>
         </div>
 
-        <div class="toolbar-right">
-          <div class="mode-switch" role="group" aria-label="Modo de vista">
-            <button type="button" [class.active]="mode() === 'edit'" (click)="mode.set('edit')">Editar</button>
-            <button type="button" [class.active]="mode() === 'split'" (click)="mode.set('split')">Dividido</button>
-            <button type="button" [class.active]="mode() === 'preview'" (click)="mode.set('preview')">Vista previa</button>
-          </div>
-
-          <span class="save-badge" [attr.data-status]="store.saveStatus()">
-            {{ statusLabel() }}
-          </span>
-        </div>
+        <span class="save-pill" [attr.data-status]="store.saveStatus()">
+          {{ statusLabel() }}
+        </span>
       </div>
 
       @if (store.conflict(); as conflict) {
@@ -68,7 +77,6 @@ type EditorMode = 'edit' | 'split' | 'preview';
               <atr-icon name="warning" size="small" />
               <span>
                 <strong>Conflicto de revisión:</strong> esta página fue modificada en otra sesión (rev. {{ conflict.serverRevision }}).
-                Tus cambios locales están protegidos en IndexedDB.
               </span>
             </div>
             <div class="conflict-actions">
@@ -76,7 +84,7 @@ type EditorMode = 'edit' | 'split' | 'preview';
                 Usar versión del servidor
               </button>
               <button atrButton type="button" size="small" appearance="filled" (click)="forceSaveLocal()">
-                Sobrescribir con mi versión
+                Conservar mi versión
               </button>
             </div>
           </div>
@@ -90,140 +98,90 @@ type EditorMode = 'edit' | 'split' | 'preview';
         </div>
       }
 
-      <div class="editor-grid" [attr.data-mode]="mode()">
-        @if (mode() !== 'preview') {
-          <textarea
-            #textareaRef
-            class="markdown-input"
-            spellcheck="true"
-            placeholder="Escribe en Markdown…"
-            [ngModel]="draft()"
-            (ngModelChange)="onDraftChange($event)"
-            (keydown)="onKeydown($event)"
-          ></textarea>
-        }
+      <div #editorHost class="trz-notion-editor" (keydown)="onKeydown($event)"></div>
 
-        @if (mode() !== 'edit') {
-          <article
-            class="markdown-preview trz-prose"
-            [innerHTML]="renderedHtml()"
-            (click)="onPreviewClick($event)"
-          ></article>
-        }
-      </div>
-
-      <footer class="editor-footer">
+      <footer class="editor-meta">
         <span>{{ wordCount() }} palabras</span>
         <span>Revisión v{{ revision() }}</span>
-        <span>Atajos: Ctrl+B · Ctrl+I · Ctrl+K · Ctrl+S</span>
+        <span class="hide-mobile">Markdown en vivo: #, **, - [ ], &gt;, \`\`\`</span>
       </footer>
     </section>
   `,
   styles: `
-    .editor-shell {
+    .notion-editor-shell {
       display: flex;
       flex-direction: column;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
-      overflow: hidden;
-      min-height: 540px;
+      gap: 0.75rem;
     }
 
-    .editor-toolbar {
+    .editor-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
       gap: 0.5rem;
-      padding: 0.45rem 0.75rem;
-      border-bottom: 1px solid var(--trz-border);
-      background: var(--trz-bg-subtle);
+      padding: 0.4rem 0.55rem;
+      border: 1px solid var(--trz-border);
+      border-radius: var(--trz-radius-md);
+      background: color-mix(in srgb, var(--trz-bg) 92%, transparent);
+      backdrop-filter: blur(8px);
     }
 
-    .toolbar-group,
-    .toolbar-right {
+    .bar-controls {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.25rem;
+      gap: 0.15rem;
     }
 
-    .tb-btn {
+    .fmt-btn {
       appearance: none;
-      border: 1px solid transparent;
+      border: 0;
       background: transparent;
       color: var(--trz-text-muted);
       font: inherit;
-      font-size: 0.8rem;
+      font-size: 0.79rem;
       padding: 0.28rem 0.48rem;
       border-radius: 5px;
       cursor: pointer;
+      transition: background 120ms ease, color 120ms ease;
 
       &:hover {
         background: var(--trz-bg-hover);
         color: var(--trz-text);
-        border-color: var(--trz-border);
+      }
+
+      &.active {
+        background: var(--trz-accent-soft);
+        color: var(--trz-accent);
+        font-weight: 600;
       }
     }
 
-    .tb-sep {
+    .bar-sep {
       width: 1px;
-      height: 18px;
+      height: 16px;
       background: var(--trz-border);
       margin: 0 0.2rem;
     }
 
-    .mode-switch {
-      display: inline-flex;
-      border: 1px solid var(--trz-border);
-      border-radius: 6px;
-      overflow: hidden;
-      background: var(--trz-bg);
-
-      button {
-        appearance: none;
-        border: 0;
-        background: transparent;
-        color: var(--trz-text-muted);
-        font: inherit;
-        font-size: 0.76rem;
-        padding: 0.28rem 0.55rem;
-        cursor: pointer;
-
-        &.active {
-          background: var(--trz-accent-soft);
-          color: var(--trz-accent);
-          font-weight: 600;
-        }
-      }
-    }
-
-    .save-badge {
+    .save-pill {
       font-size: 0.74rem;
-      font-weight: 600;
-      padding: 0.2rem 0.55rem;
+      font-weight: 500;
+      padding: 0.18rem 0.55rem;
       border-radius: 999px;
-      background: var(--trz-bg);
+      background: var(--trz-bg-subtle);
       color: var(--trz-text-muted);
-      border: 1px solid var(--trz-border);
 
-      &[data-status="synced"] {
-        color: var(--trz-success);
-        border-color: color-mix(in srgb, var(--trz-success) 35%, transparent);
-      }
-      &[data-status="saved_local"] {
-        color: var(--trz-accent);
-      }
+      &[data-status="synced"] { color: var(--trz-success); }
+      &[data-status="saved_local"] { color: var(--trz-accent); }
       &[data-status="pending"],
-      &[data-status="saving"] {
-        color: var(--trz-warning);
-      }
+      &[data-status="saving"] { color: var(--trz-warning); }
       &[data-status="error"],
-      &[data-status="conflict"] {
-        color: var(--trz-danger);
-        border-color: color-mix(in srgb, var(--trz-danger) 40%, transparent);
-      }
+      &[data-status="conflict"] { color: var(--trz-danger); }
     }
 
     .conflict-banner,
@@ -232,20 +190,19 @@ type EditorMode = 'edit' | 'split' | 'preview';
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 0.65rem;
       padding: 0.65rem 0.9rem;
+      border-radius: var(--trz-radius-sm);
       font-size: 0.83rem;
-      border-bottom: 1px solid var(--trz-border);
+      border: 1px solid var(--trz-border);
     }
 
     .conflict-banner {
       background: color-mix(in srgb, var(--trz-danger) 10%, transparent);
-      color: var(--trz-text);
     }
 
     .info-banner {
       background: color-mix(in srgb, var(--trz-warning) 10%, transparent);
-      color: var(--trz-text);
       justify-content: flex-start;
     }
 
@@ -257,99 +214,47 @@ type EditorMode = 'edit' | 'split' | 'preview';
 
     .conflict-actions {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.45rem;
     }
 
-    .editor-grid {
-      flex: 1;
-      display: grid;
-      min-height: 460px;
-
-      &[data-mode="edit"],
-      &[data-mode="preview"] {
-        grid-template-columns: 1fr;
-      }
-
-      &[data-mode="split"] {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    .markdown-input {
-      width: 100%;
-      min-height: 460px;
-      border: 0;
-      border-right: 1px solid var(--trz-border);
-      padding: 1.15rem 1.25rem;
-      background: var(--trz-bg-elevated);
-      color: var(--trz-text);
-      font-family: var(--trz-font-mono);
-      font-size: 0.88rem;
-      line-height: 1.65;
-      resize: vertical;
-      outline: none;
-    }
-
-    .markdown-preview {
-      padding: 1.15rem 1.5rem;
-      overflow-y: auto;
-      background: var(--trz-bg-elevated);
-    }
-
-    .editor-footer {
+    .editor-meta {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       gap: 0.75rem;
-      padding: 0.45rem 0.9rem;
+      padding-top: 0.75rem;
       border-top: 1px solid var(--trz-border);
-      background: var(--trz-bg-subtle);
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       color: var(--trz-text-subtle);
     }
 
-    @media (max-width: 960px) {
-      .editor-grid[data-mode="split"] {
-        grid-template-columns: 1fr;
-      }
-      .markdown-input {
-        border-right: 0;
-        border-bottom: 1px solid var(--trz-border);
-      }
+    @media (max-width: 640px) {
+      .hide-mobile { display: none; }
     }
   `,
 })
-export class PageEditorComponent {
+export class PageEditorComponent implements AfterViewInit {
   readonly pageId = input.required<string>();
   readonly initialMarkdown = input.required<string>();
   readonly revision = input.required<number>();
   readonly saved = output<{ revision: number; markdown: string }>();
 
   protected readonly store = inject(KnowledgeStore);
-  private readonly sanitizer = inject(DomSanitizer);
-  private readonly snackbar = inject(AtralumeSnackbar);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly editorHost = viewChild.required<ElementRef<HTMLDivElement>>('editorHost');
 
-  private readonly textareaRef = viewChild<ElementRef<HTMLTextAreaElement>>('textareaRef');
-
-  protected readonly draft = signal('');
-  protected readonly mode = signal<EditorMode>('split');
+  private editor: Editor | null = null;
   private activeRevision = 1;
+  private lastLoadedPageId = '';
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  protected readonly renderedHtml = computed<SafeHtml>(() =>
-    this.sanitizer.bypassSecurityTrustHtml(renderSafeMarkdown(this.draft())),
-  );
-
-  protected readonly wordCount = computed(() => {
-    const trimmed = this.draft().trim();
-    return trimmed ? trimmed.split(/\s+/).length : 0;
-  });
+  protected readonly wordCount = signal(0);
+  protected readonly selectionTick = signal(0);
 
   protected readonly statusLabel = computed(() => {
     const map: Record<SaveStatus, string> = {
-      idle: 'Listo',
-      pending: 'Pendiente…',
+      idle: 'Guardado',
+      pending: 'Editando…',
       saving: 'Guardando…',
       saved_local: 'Guardado local',
       synced: 'Sincronizado',
@@ -361,46 +266,134 @@ export class PageEditorComponent {
 
   constructor() {
     effect(() => {
-      // Reset draft when switching to a different page
-      const _id = this.pageId();
-      this.draft.set(this.initialMarkdown());
-      this.activeRevision = this.revision();
+      const id = this.pageId();
+      const md = this.initialMarkdown();
+      const rev = this.revision();
+      this.activeRevision = rev;
+
+      if (this.editor && id !== this.lastLoadedPageId) {
+        this.lastLoadedPageId = id;
+        this.editor.commands.setContent(md || '', { emitUpdate: false });
+        this.updateWordCount();
+      }
     });
 
     this.destroyRef.onDestroy(() => {
       if (this.saveTimer) clearTimeout(this.saveTimer);
+      this.editor?.destroy();
+      this.editor = null;
     });
   }
 
-  protected onDraftChange(value: string): void {
-    this.draft.set(value);
-    this.store.markPendingSave();
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      void this.flushSave();
-    }, 900);
+  ngAfterViewInit(): void {
+    this.lastLoadedPageId = this.pageId();
+    this.editor = new Editor({
+      element: this.editorHost().nativeElement,
+      extensions: [
+        StarterKit.configure({
+          codeBlock: false,
+          link: false,
+        }),
+        CodeBlockLowlight.configure({ lowlight }),
+        Placeholder.configure({
+          placeholder:
+            'Empieza a escribir o usa atajos Markdown (# título, - lista, [ ] tarea, > cita, ``` código)…',
+        }),
+        TaskList,
+        TaskItem.configure({ nested: true }),
+        Table.configure({ resizable: false }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        Link.configure({
+          openOnClick: false,
+          autolink: true,
+        }),
+        Markdown.configure({
+          html: false,
+          tightLists: true,
+          transformPastedText: true,
+          transformCopiedText: true,
+        }),
+      ],
+      content: this.initialMarkdown() || '',
+      onUpdate: () => {
+        this.updateWordCount();
+        this.scheduleSave();
+      },
+      onSelectionUpdate: () => {
+        this.selectionTick.update((n) => n + 1);
+      },
+      onTransaction: () => {
+        this.selectionTick.update((n) => n + 1);
+      },
+    });
+    this.updateWordCount();
   }
 
-  protected async flushSave(): Promise<void> {
-    if (this.saveTimer) {
-      clearTimeout(this.saveTimer);
-      this.saveTimer = null;
+  protected isActive(name: string, attrs?: Record<string, unknown>): boolean {
+    this.selectionTick();
+    return this.editor?.isActive(name, attrs) ?? false;
+  }
+
+  protected toggleHeading(level: 1 | 2 | 3): void {
+    this.editor?.chain().focus().toggleHeading({ level }).run();
+  }
+
+  protected cmd(
+    action:
+      | 'toggleBold'
+      | 'toggleItalic'
+      | 'toggleStrike'
+      | 'toggleCode'
+      | 'toggleBulletList'
+      | 'toggleOrderedList'
+      | 'toggleTaskList'
+      | 'toggleBlockquote'
+      | 'toggleCodeBlock'
+      | 'setHorizontalRule',
+  ): void {
+    if (!this.editor) return;
+    const chain = this.editor.chain().focus();
+    (chain[action] as () => typeof chain)().run();
+  }
+
+  protected insertTable(): void {
+    this.editor
+      ?.chain()
+      .focus()
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+      .run();
+  }
+
+  protected setLink(): void {
+    if (!this.editor) return;
+    const prev = (this.editor.getAttributes('link')['href'] as string | undefined) ?? '';
+    const url = window.prompt('URL del enlace:', prev || 'https://');
+    if (url === null) return;
+    if (!url.trim()) {
+      this.editor.chain().focus().extendMarkRange('link').unsetLink().run();
+      return;
     }
-    const result = await this.store.savePageContent(
-      this.pageId(),
-      this.draft(),
-      this.activeRevision,
-    );
-    if (result) {
-      this.activeRevision = result.revision;
-      this.saved.emit({ revision: result.revision, markdown: result.content.markdown });
+    this.editor
+      .chain()
+      .focus()
+      .extendMarkRange('link')
+      .setLink({ href: url.trim() })
+      .run();
+  }
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void this.flushSave();
     }
   }
 
   protected async acceptServerVersion(): Promise<void> {
     const conflict = this.store.conflict();
-    if (!conflict) return;
-    this.draft.set(conflict.serverMarkdown);
+    if (!conflict || !this.editor) return;
+    this.editor.commands.setContent(conflict.serverMarkdown, { emitUpdate: false });
     this.activeRevision = conflict.serverRevision;
     await this.flushSave();
   }
@@ -412,89 +405,38 @@ export class PageEditorComponent {
     await this.flushSave();
   }
 
-  protected onKeydown(event: KeyboardEvent): void {
-    if (!(event.ctrlKey || event.metaKey)) return;
-    const key = event.key.toLowerCase();
-    if (key === 'b') {
-      event.preventDefault();
-      this.wrapSelection('**', '**', 'negrita');
-    } else if (key === 'i') {
-      event.preventDefault();
-      this.wrapSelection('_', '_', 'cursiva');
-    } else if (key === 'k') {
-      event.preventDefault();
-      this.insertLink();
-    } else if (key === 's') {
-      event.preventDefault();
+  private getMarkdown(): string {
+    const storage = this.editor?.storage as MarkdownStorage | undefined;
+    return storage?.markdown?.getMarkdown() ?? '';
+  }
+
+  private updateWordCount(): void {
+    const text = this.editor?.getText().trim() ?? '';
+    this.wordCount.set(text ? text.split(/\s+/).length : 0);
+  }
+
+  private scheduleSave(): void {
+    this.store.markPendingSave();
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => {
       void this.flushSave();
+    }, 900);
+  }
+
+  private async flushSave(): Promise<void> {
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
     }
-  }
-
-  protected onPreviewClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement | null;
-    if (!target?.matches('button[data-copy-code="true"]')) return;
-    const block = target.closest('.trz-code-block');
-    const codeText = block?.querySelector('code')?.textContent ?? '';
-    if (!codeText) return;
-    void navigator.clipboard.writeText(codeText).then(() => {
-      target.textContent = 'Copiado';
-      setTimeout(() => (target.textContent = 'Copiar'), 1500);
-      this.snackbar.open({ message: 'Código copiado al portapapeles.', tone: 'success', duration: 2000 });
-    });
-  }
-
-  protected wrapSelection(before: string, after: string, fallback: string): void {
-    const el = this.textareaRef()?.nativeElement;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const value = this.draft();
-    const selected = value.slice(start, end) || fallback;
-    const next = value.slice(0, start) + before + selected + after + value.slice(end);
-    this.onDraftChange(next);
-    queueMicrotask(() => {
-      el.focus();
-      el.setSelectionRange(start + before.length, start + before.length + selected.length);
-    });
-  }
-
-  protected prefixLine(prefix: string): void {
-    const el = this.textareaRef()?.nativeElement;
-    if (!el) return;
-    const start = el.selectionStart;
-    const value = this.draft();
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const next = value.slice(0, lineStart) + prefix + value.slice(lineStart);
-    this.onDraftChange(next);
-    queueMicrotask(() => {
-      el.focus();
-      el.setSelectionRange(start + prefix.length, start + prefix.length);
-    });
-  }
-
-  protected insertLink(): void {
-    this.wrapSelection('[', '](https://)', 'enlace');
-  }
-
-  protected insertCodeBlock(): void {
-    this.insertBlock('\n```typescript\n// código aquí\n```\n');
-  }
-
-  protected insertTable(): void {
-    this.insertBlock('\n| Columna 1 | Columna 2 |\n| --- | --- |\n| Valor A | Valor B |\n');
-  }
-
-  protected insertBlock(snippet: string): void {
-    const el = this.textareaRef()?.nativeElement;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const value = this.draft();
-    const next = value.slice(0, start) + snippet + value.slice(end);
-    this.onDraftChange(next);
-    queueMicrotask(() => {
-      el.focus();
-      el.setSelectionRange(start + snippet.length, start + snippet.length);
-    });
+    const markdown = this.getMarkdown();
+    const result = await this.store.savePageContent(
+      this.pageId(),
+      markdown,
+      this.activeRevision,
+    );
+    if (result) {
+      this.activeRevision = result.revision;
+      this.saved.emit({ revision: result.revision, markdown: result.content.markdown });
+    }
   }
 }

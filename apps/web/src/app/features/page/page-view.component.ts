@@ -38,17 +38,17 @@ import { PageEditorComponent } from './page-editor.component';
       />
     } @else if (resolved(); as data) {
       @if (data.page; as page) {
-        <div class="page-view">
-          <div class="page-top">
+        <div class="doc-container">
+          <div class="doc-header-bar">
             <trz-page-breadcrumbs [segments]="data.breadcrumbs" />
-            <div class="page-actions">
-              <button atrButton type="button" size="small" appearance="outlined" (click)="createSubpage()">
+            <div class="doc-actions">
+              <button atrButton type="button" size="small" appearance="text" (click)="createSubpage()">
                 + Subpágina
               </button>
-              <button atrButton type="button" size="small" appearance="outlined" (click)="duplicatePage()">
+              <button atrButton type="button" size="small" appearance="text" (click)="duplicatePage()">
                 Duplicar
               </button>
-              <button atrButton type="button" size="small" appearance="outlined" (click)="toggleMovePanel()">
+              <button atrButton type="button" size="small" appearance="text" (click)="toggleMovePanel()">
                 Mover
               </button>
               <button atrButton type="button" size="small" appearance="text" (click)="archivePage()">
@@ -60,29 +60,29 @@ import { PageEditorComponent } from './page-editor.component';
             </div>
           </div>
 
-          <div class="title-row">
+          <header class="doc-title-block">
             <input
-              class="page-title-input"
+              class="doc-title-input"
               type="text"
+              placeholder="Sin título"
               [ngModel]="titleDraft()"
               (ngModelChange)="titleDraft.set($event)"
               (blur)="commitTitle()"
               (keydown.enter)="commitTitle()"
               aria-label="Título de la página"
             />
-            <div class="slug-row">
-              <span class="slug-label">Ruta:</span>
+            <div class="doc-meta-row">
               <code class="slug-value">{{ data.canonicalPath }}</code>
-              <button type="button" class="slug-edit-btn" (click)="renameSlug()">Cambiar slug</button>
+              <button type="button" class="slug-edit-btn" (click)="renameSlug()">Editar ruta</button>
             </div>
-          </div>
+          </header>
 
           @if (moveOpen()) {
             <div class="move-panel">
               <strong>Mover página</strong>
               <div class="move-controls">
                 <label>
-                  Espacio destino:
+                  <span>Espacio destino</span>
                   <select [ngModel]="moveTargetWsId()" (ngModelChange)="moveTargetWsId.set($event); moveTargetParentId.set('')">
                     @for (ws of orgWorkspaces(); track ws.id) {
                       <option [value]="ws.id">{{ ws.name }}</option>
@@ -90,7 +90,7 @@ import { PageEditorComponent } from './page-editor.component';
                   </select>
                 </label>
                 <label>
-                  Página padre:
+                  <span>Página padre</span>
                   <select [ngModel]="moveTargetParentId()" (ngModelChange)="moveTargetParentId.set($event)">
                     <option value="">(Raíz del espacio)</option>
                     @for (candidate of moveCandidates(); track candidate.id) {
@@ -98,8 +98,10 @@ import { PageEditorComponent } from './page-editor.component';
                     }
                   </select>
                 </label>
-                <button atrButton type="button" size="small" (click)="confirmMove()">Aplicar movimiento</button>
-                <button atrButton type="button" size="small" appearance="text" (click)="moveOpen.set(false)">Cancelar</button>
+                <div class="move-btns">
+                  <button atrButton type="button" size="small" appearance="filled" (click)="confirmMove()">Mover aquí</button>
+                  <button atrButton type="button" size="small" appearance="text" (click)="moveOpen.set(false)">Cancelar</button>
+                </div>
               </div>
             </div>
           }
@@ -129,57 +131,56 @@ import { PageEditorComponent } from './page-editor.component';
     }
   `,
   styles: `
-    .page-view {
-      max-width: 1180px;
+    .doc-container {
+      max-width: 820px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 1.1rem;
+      gap: 1.25rem;
     }
 
-    .page-top {
+    .doc-header-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.75rem;
+      gap: 0.5rem 1rem;
     }
 
-    .page-actions {
+    .doc-actions {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.35rem;
+      align-items: center;
+      gap: 0.15rem;
     }
 
-    .title-row {
+    .doc-title-block {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.4rem;
+      padding-top: 0.25rem;
     }
 
-    .page-title-input {
+    .doc-title-input {
+      width: 100%;
       border: 0;
       outline: none;
       background: transparent;
       color: var(--trz-text);
       font-family: inherit;
-      font-size: 1.9rem;
-      font-weight: 700;
-      letter-spacing: -0.025em;
-      padding: 0.15rem 0;
-      border-bottom: 2px solid transparent;
-
-      &:focus {
-        border-bottom-color: var(--trz-accent);
-      }
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      font-weight: 750;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      padding: 0;
     }
 
-    .slug-row {
+    .doc-meta-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 0.78rem;
+      gap: 0.55rem;
+      font-size: 0.76rem;
       color: var(--trz-text-subtle);
     }
 
@@ -188,6 +189,8 @@ import { PageEditorComponent } from './page-editor.component';
       background: var(--trz-bg-subtle);
       padding: 0.15rem 0.45rem;
       border-radius: 4px;
+      max-width: 100%;
+      overflow-x: auto;
     }
 
     .slug-edit-btn {
@@ -198,9 +201,7 @@ import { PageEditorComponent } from './page-editor.component';
       font: inherit;
       cursor: pointer;
       padding: 0;
-      &:hover {
-        text-decoration: underline;
-      }
+      &:hover { text-decoration: underline; }
     }
 
     .move-panel {
@@ -210,66 +211,77 @@ import { PageEditorComponent } from './page-editor.component';
       background: var(--trz-bg-subtle);
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
-      font-size: 0.85rem;
+      gap: 0.7rem;
+      font-size: 0.84rem;
     }
 
     .move-controls {
       display: flex;
       flex-wrap: wrap;
-      align-items: center;
+      align-items: flex-end;
       gap: 0.75rem;
 
       label {
         display: flex;
-        align-items: center;
-        gap: 0.4rem;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.78rem;
+        color: var(--trz-text-muted);
       }
 
       select {
-        padding: 0.35rem 0.55rem;
+        height: 32px;
+        padding: 0 0.55rem;
         border: 1px solid var(--trz-border-strong);
         border-radius: 6px;
-        background: var(--trz-bg-elevated);
+        background: var(--trz-bg);
         color: var(--trz-text);
         font: inherit;
       }
     }
 
+    .move-btns {
+      display: flex;
+      gap: 0.35rem;
+    }
+
     .subpages-section {
       margin-top: 0.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--trz-border);
 
       h2 {
-        font-size: 0.92rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.05em;
         color: var(--trz-text-subtle);
-        margin: 0 0 0.65rem;
+        margin: 0 0 0.7rem;
       }
     }
 
     .subpages-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 0.65rem;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 0.6rem;
     }
 
     .subpage-card {
       display: flex;
       align-items: center;
       gap: 0.55rem;
-      padding: 0.75rem 0.9rem;
+      padding: 0.7rem 0.9rem;
       border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
+      border-radius: var(--trz-radius-sm);
       background: var(--trz-bg-elevated);
       color: var(--trz-text);
       text-decoration: none;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       font-weight: 500;
+      transition: border-color 140ms ease, background 140ms ease;
 
       &:hover {
-        border-color: var(--trz-accent);
-        background: var(--trz-bg-hover);
+        border-color: var(--trz-border-strong);
+        background: var(--trz-bg-subtle);
       }
     }
   `,

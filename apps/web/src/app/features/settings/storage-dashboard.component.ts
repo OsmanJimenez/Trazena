@@ -25,76 +25,80 @@ import { IndexedDbService } from '../../core/storage/indexeddb.service';
 
       @if (stats(); as s) {
         <div class="metrics-grid">
-          <atr-card appearance="outlined" class="metric">
-            <span class="label">Organizaciones</span>
-            <strong>{{ s.organizationsCount }}</strong>
+          <atr-card appearance="outlined">
+            <div class="metric-inner">
+              <span class="label">Organizaciones</span>
+              <strong>{{ s.organizationsCount }}</strong>
+            </div>
           </atr-card>
-          <atr-card appearance="outlined" class="metric">
-            <span class="label">Espacios</span>
-            <strong>{{ s.workspacesCount }}</strong>
+          <atr-card appearance="outlined">
+            <div class="metric-inner">
+              <span class="label">Espacios</span>
+              <strong>{{ s.workspacesCount }}</strong>
+            </div>
           </atr-card>
-          <atr-card appearance="outlined" class="metric">
-            <span class="label">Páginas activas</span>
-            <strong>{{ s.pagesCount }}</strong>
+          <atr-card appearance="outlined">
+            <div class="metric-inner">
+              <span class="label">Páginas activas</span>
+              <strong>{{ s.pagesCount }}</strong>
+            </div>
           </atr-card>
-          <atr-card appearance="outlined" class="metric">
-            <span class="label">En papelera / archivadas</span>
-            <strong>{{ s.deletedPagesCount }} / {{ s.archivedPagesCount }}</strong>
+          <atr-card appearance="outlined">
+            <div class="metric-inner">
+              <span class="label">Papelera / archivadas</span>
+              <strong>{{ s.deletedPagesCount }} / {{ s.archivedPagesCount }}</strong>
+            </div>
           </atr-card>
         </div>
 
-        <atr-card appearance="outlined" class="panel">
-          <h2>Cuota y persistencia</h2>
-          <div class="row">
-            <span>Contenido Markdown acumulado</span>
-            <strong>{{ formatBytes(s.totalContentBytes) }}</strong>
-          </div>
-          <div class="row">
-            <span>Uso estimado en D1 (con índices FTS5)</span>
-            <strong>{{ formatBytes(s.estimatedDbBytes) }} / {{ formatBytes(s.d1FreeTierLimitBytes) }}</strong>
-          </div>
-          <div class="row">
-            <span>Cuota IndexedDB del navegador</span>
-            <strong>{{ formatBytes(browserUsage()) }} / {{ formatBytes(browserQuota()) }}</strong>
-          </div>
-          <div class="row">
-            <span>Operaciones pendientes de sincronización</span>
-            <strong>{{ store.pendingSyncCount() }}</strong>
+        <atr-card appearance="outlined">
+          <div class="card-inner">
+            <h2>Cuota y persistencia</h2>
+            <div class="row">
+              <span>Contenido Markdown acumulado</span>
+              <strong>{{ formatBytes(s.totalContentBytes) }}</strong>
+            </div>
+            <div class="row">
+              <span>Uso estimado en D1 (con índices FTS5)</span>
+              <strong>{{ formatBytes(s.estimatedDbBytes) }} / {{ formatBytes(s.d1FreeTierLimitBytes) }}</strong>
+            </div>
+            <div class="row">
+              <span>Cuota IndexedDB del navegador</span>
+              <strong>{{ formatBytes(browserUsage()) }} / {{ formatBytes(browserQuota()) }}</strong>
+            </div>
+            <div class="row">
+              <span>Operaciones pendientes de sincronización</span>
+              <strong>{{ store.pendingSyncCount() }}</strong>
+            </div>
           </div>
         </atr-card>
       }
     </div>
   `,
   styles: `
-    .storage-page { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
-    .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; }
-    h1 { margin: 0; font-size: 1.7rem; }
-    .header p { margin: 0.3rem 0 0; color: var(--trz-text-muted); }
-    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.85rem; }
-    .metric {
+    .storage-page { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+    .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
+    h1 { margin: 0; font-size: clamp(1.45rem, 2.5vw, 1.8rem); letter-spacing: -0.025em; }
+    .header p { margin: 0.3rem 0 0; color: var(--trz-text-muted); font-size: 0.9rem; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 0.85rem; }
+    .metric-inner {
       padding: 1rem 1.15rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
       display: flex; flex-direction: column; gap: 0.35rem;
-      .label { font-size: 0.78rem; color: var(--trz-text-subtle); text-transform: uppercase; letter-spacing: 0.04em; }
-      strong { font-size: 1.55rem; }
+      .label { font-size: 0.72rem; color: var(--trz-text-subtle); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+      strong { font-size: 1.55rem; font-weight: 700; }
     }
-    .panel {
-      padding: 1.25rem;
-      border: 1px solid var(--trz-border);
-      border-radius: var(--trz-radius-md);
-      background: var(--trz-bg-elevated);
-      display: flex; flex-direction: column; gap: 0.6rem;
-      h2 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .card-inner {
+      padding: 1.25rem 1.35rem;
+      display: flex; flex-direction: column; gap: 0.55rem;
+      h2 { margin: 0 0 0.3rem; font-size: 0.96rem; font-weight: 650; }
     }
     .row {
       display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem;
       padding: 0.5rem 0;
       border-bottom: 1px solid var(--trz-border);
-      font-size: 0.88rem;
+      font-size: 0.87rem;
       span { color: var(--trz-text-muted); }
-      &:last-child { border-bottom: 0; }
+      &:last-child { border-bottom: 0; padding-bottom: 0; }
     }
   `,
 })

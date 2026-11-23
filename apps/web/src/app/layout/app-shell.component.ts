@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -8,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import type { PageTreeItem, SearchResultItem } from '@trazena/shared';
+import type { SearchResultItem } from '@trazena/shared';
 import { AtralumeButton } from '@osmanjimenez/atralume/button';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeIconButton } from '@osmanjimenez/atralume/icon-button';
@@ -33,10 +34,14 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="shell" [class.sidebar-closed]="!sidebarOpen()">
+    <div class="shell" [class.sidebar-closed]="!sidebarOpen()" [class.is-mobile]="isMobile()">
+      @if (isMobile() && sidebarOpen()) {
+        <div class="sidebar-backdrop" (click)="sidebarOpen.set(false)" aria-hidden="true"></div>
+      }
+
       <aside class="sidebar" aria-label="Navegación principal">
         <div class="sidebar-header">
-          <a routerLink="/" class="brand">
+          <a routerLink="/" class="brand" (click)="closeOnMobile()">
             <span class="brand-mark">T</span>
             <span class="brand-name">Trazena</span>
           </a>
@@ -53,11 +58,11 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
         </div>
 
         <div class="org-switcher">
-          <label class="switcher-label" for="trz-org-select">Organización</label>
           <div class="switcher-row">
             <select
               id="trz-org-select"
               class="org-select"
+              aria-label="Organización activa"
               [ngModel]="selectedOrgId()"
               (ngModelChange)="selectOrg($event)"
             >
@@ -83,7 +88,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
           <atr-icon name="search" size="small" />
           <input
             type="search"
-            placeholder="Buscar páginas…"
+            placeholder="Buscar…"
             [ngModel]="searchQuery()"
             (ngModelChange)="onSearch($event)"
           />
@@ -134,7 +139,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
                       (click)="closeOnMobile()"
                     >
                       <atr-icon [name]="ws.icon || 'book'" size="small" />
-                      <span>{{ ws.name }}</span>
+                      <span class="ws-name">{{ ws.name }}</span>
                     </a>
                     <button
                       type="button"
@@ -183,20 +188,21 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       <div class="main-column">
         <header class="topbar">
           <div class="topbar-left">
-            @if (!sidebarOpen()) {
+            @if (!sidebarOpen() || isMobile()) {
               <button
                 atrIconButton
                 type="button"
                 appearance="standard"
                 size="small"
-                aria-label="Mostrar panel lateral"
-                (click)="sidebarOpen.set(true)"
+                aria-label="Abrir panel lateral"
+                (click)="sidebarOpen.set(!sidebarOpen())"
               >
-                <atr-icon name="sidebar" size="small" />
+                <atr-icon name="menu" size="small" />
               </button>
             }
-            <span class="mode-pill" [class.is-remote]="auth.isRemoteApiEnabled">
-              {{ auth.isRemoteApiEnabled ? 'Cloudflare D1' : 'IndexedDB Local' }}
+            <span class="mode-dot" [class.is-remote]="auth.isRemoteApiEnabled">
+              <span class="dot"></span>
+              <span class="mode-text">{{ auth.isRemoteApiEnabled ? 'Cloudflare D1' : 'Local IndexedDB' }}</span>
             </span>
           </div>
 
@@ -240,13 +246,13 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
   styles: `
     .shell {
       display: grid;
-      grid-template-columns: 280px 1fr;
-      height: 100vh;
+      grid-template-columns: 264px 1fr;
+      height: 100dvh;
       overflow: hidden;
       background: var(--trz-bg);
     }
 
-    .shell.sidebar-closed {
+    .shell.sidebar-closed:not(.is-mobile) {
       grid-template-columns: 0 1fr;
       .sidebar {
         transform: translateX(-100%);
@@ -254,91 +260,97 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       }
     }
 
+    .sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.36);
+      backdrop-filter: blur(2px);
+      z-index: 35;
+    }
+
     .sidebar {
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      background: var(--trz-bg-elevated);
+      height: 100dvh;
+      background: var(--trz-bg-sidebar);
       border-right: 1px solid var(--trz-border);
       overflow: hidden;
       transition: transform 180ms ease;
+      z-index: 40;
     }
 
     .sidebar-header {
       height: var(--trz-topbar-height);
-      padding: 0 0.85rem;
+      padding: 0 0.75rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--trz-border);
       flex-shrink: 0;
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      gap: 0.55rem;
       text-decoration: none;
       color: var(--trz-text);
       font-weight: 700;
+      font-size: 0.95rem;
       letter-spacing: -0.02em;
     }
 
     .brand-mark {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
       background: var(--trz-text);
       color: var(--trz-bg);
       display: grid;
       place-items: center;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     .org-switcher {
-      padding: 0.75rem 0.85rem 0.5rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .switcher-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--trz-text-subtle);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      padding: 0.25rem 0.75rem 0.5rem;
     }
 
     .switcher-row {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.3rem;
     }
 
     .org-select {
       flex: 1;
       min-width: 0;
-      padding: 0.45rem 0.6rem;
-      border: 1px solid var(--trz-border-strong);
+      height: 32px;
+      padding: 0 0.55rem;
+      border: 1px solid var(--trz-border);
       border-radius: var(--trz-radius-sm);
       background: var(--trz-bg);
       color: var(--trz-text);
       font: inherit;
-      font-size: 0.86rem;
-      font-weight: 500;
+      font-size: 0.84rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+
+      &:focus {
+        border-color: var(--trz-border-strong);
+      }
     }
 
     .search-box {
-      margin: 0.25rem 0.85rem 0.6rem;
-      padding: 0.4rem 0.65rem;
+      margin: 0 0.75rem 0.5rem;
+      padding: 0 0.6rem;
+      height: 32px;
       display: flex;
       align-items: center;
       gap: 0.45rem;
       border: 1px solid var(--trz-border);
       border-radius: var(--trz-radius-sm);
       background: var(--trz-bg);
-      color: var(--trz-text-muted);
+      color: var(--trz-text-subtle);
 
       input {
         flex: 1;
@@ -348,7 +360,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
         background: transparent;
         color: var(--trz-text);
         font: inherit;
-        font-size: 0.84rem;
+        font-size: 0.83rem;
       }
     }
 
@@ -356,24 +368,23 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
     .search-results {
       flex: 1;
       overflow-y: auto;
-      padding: 0.35rem 0.65rem 1rem;
+      padding: 0.25rem 0.55rem 1rem;
     }
 
     .section-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.35rem 0.3rem;
-      margin-bottom: 0.25rem;
+      padding: 0.4rem 0.35rem 0.25rem;
     }
 
     .section-link,
     .section-label {
-      font-size: 0.73rem;
+      font-size: 0.7rem;
       font-weight: 600;
       color: var(--trz-text-subtle);
       text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.05em;
       text-decoration: none;
     }
 
@@ -381,7 +392,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       appearance: none;
       border: 0;
       background: transparent;
-      color: var(--trz-text-muted);
+      color: var(--trz-text-subtle);
       width: 22px;
       height: 22px;
       border-radius: 4px;
@@ -403,8 +414,8 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 0.25rem;
-      padding: 0.2rem 0.25rem;
+      gap: 0.2rem;
+      padding: 0.15rem 0.25rem;
       border-radius: var(--trz-radius-sm);
 
       &:hover {
@@ -420,14 +431,20 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       gap: 0.45rem;
       text-decoration: none;
       color: var(--trz-text);
-      font-size: 0.87rem;
+      font-size: 0.855rem;
       font-weight: 600;
-      padding: 0.2rem 0.2rem;
+      padding: 0.22rem 0.2rem;
       border-radius: var(--trz-radius-sm);
 
       &.is-active {
         color: var(--trz-accent);
       }
+    }
+
+    .ws-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .search-item {
@@ -443,37 +460,29 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       }
     }
 
-    .search-item-title {
-      font-size: 0.86rem;
-      font-weight: 500;
-    }
-
-    .search-item-path {
-      font-size: 0.74rem;
-      color: var(--trz-text-subtle);
-      font-family: var(--trz-font-mono);
-    }
+    .search-item-title { font-size: 0.85rem; font-weight: 500; }
+    .search-item-path { font-size: 0.72rem; color: var(--trz-text-subtle); font-family: var(--trz-font-mono); }
 
     .empty-hint {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       color: var(--trz-text-subtle);
-      padding: 0.5rem 0.35rem;
+      padding: 0.45rem 0.35rem;
       margin: 0;
     }
 
     .empty-org {
-      padding: 0.75rem 0.35rem;
+      padding: 0.65rem 0.35rem;
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
+      gap: 0.55rem;
     }
 
     .sidebar-footer {
       border-top: 1px solid var(--trz-border);
-      padding: 0.55rem 0.65rem;
+      padding: 0.5rem 0.55rem;
       display: flex;
       flex-direction: column;
-      gap: 0.2rem;
+      gap: 0.15rem;
     }
 
     .footer-link {
@@ -484,7 +493,7 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       border-radius: var(--trz-radius-sm);
       color: var(--trz-text-muted);
       text-decoration: none;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
 
       &:hover {
         background: var(--trz-bg-hover);
@@ -492,8 +501,8 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       }
 
       &.is-active {
-        background: var(--trz-accent-soft);
-        color: var(--trz-accent);
+        background: var(--trz-bg-hover);
+        color: var(--trz-text);
         font-weight: 600;
       }
     }
@@ -502,19 +511,20 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       display: flex;
       flex-direction: column;
       min-width: 0;
-      height: 100vh;
+      height: 100dvh;
       overflow: hidden;
+      background: var(--trz-bg);
     }
 
     .topbar {
       height: var(--trz-topbar-height);
       padding: 0 1.25rem;
       border-bottom: 1px solid var(--trz-border);
-      background: var(--trz-bg-elevated);
+      background: var(--trz-bg);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
+      gap: 0.75rem;
       flex-shrink: 0;
     }
 
@@ -523,28 +533,33 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      min-width: 0;
     }
 
-    .mode-pill {
-      font-size: 0.74rem;
-      font-weight: 600;
-      padding: 0.2rem 0.55rem;
-      border-radius: 999px;
-      background: var(--trz-bg-subtle);
-      color: var(--trz-text-muted);
-      border: 1px solid var(--trz-border);
+    .mode-dot {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.76rem;
+      color: var(--trz-text-subtle);
+      font-weight: 500;
 
-      &.is-remote {
-        background: var(--trz-accent-soft);
-        color: var(--trz-accent);
-        border-color: transparent;
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--trz-text-subtle);
+      }
+
+      &.is-remote .dot {
+        background: var(--trz-success);
       }
     }
 
     .user-badge {
-      font-size: 0.84rem;
+      font-size: 0.82rem;
       color: var(--trz-text-muted);
-      max-width: 160px;
+      max-width: 140px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -553,22 +568,34 @@ import { PageTreeComponent } from '../features/page/page-tree.component';
     .content-area {
       flex: 1;
       overflow-y: auto;
-      padding: 1.5rem 2rem;
+      padding: 2rem 2.5rem;
     }
 
-    @media (max-width: 860px) {
-      .shell {
-        grid-template-columns: 1fr;
-      }
+    .shell.is-mobile {
+      grid-template-columns: 1fr;
+
       .sidebar {
         position: fixed;
         inset: 0 auto 0 0;
-        width: 280px;
-        z-index: 40;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+        width: min(290px, 84vw);
+        box-shadow: var(--trz-shadow-md);
       }
+
+      &.sidebar-closed .sidebar {
+        transform: translateX(-105%);
+        box-shadow: none;
+      }
+
+      .topbar {
+        padding: 0 0.75rem;
+      }
+
+      .user-badge {
+        display: none;
+      }
+
       .content-area {
-        padding: 1rem;
+        padding: 1.25rem 1rem 3rem;
       }
     }
   `,
@@ -579,10 +606,12 @@ export class AppShellComponent implements OnInit {
   protected readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
+  private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly sidebarOpen = signal(
-    typeof window !== 'undefined' ? window.innerWidth > 860 : true,
+  protected readonly isMobile = signal(
+    typeof window !== 'undefined' ? window.innerWidth <= 900 : false,
   );
+  protected readonly sidebarOpen = signal(!this.isMobile());
   protected readonly selectedOrgId = signal<string>('');
   protected readonly searchQuery = signal('');
   protected readonly searchResults = signal<SearchResultItem[]>([]);
@@ -598,6 +627,18 @@ export class AppShellComponent implements OnInit {
     return org ? this.store.getWorkspacesForOrg(org.id) : [];
   });
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      const mql = window.matchMedia('(max-width: 900px)');
+      const onChange = (e: MediaQueryListEvent) => {
+        this.isMobile.set(e.matches);
+        this.sidebarOpen.set(!e.matches);
+      };
+      mql.addEventListener('change', onChange);
+      this.destroyRef.onDestroy(() => mql.removeEventListener('change', onChange));
+    }
+  }
+
   async ngOnInit(): Promise<void> {
     await this.store.initialize();
     const first = this.store.activeOrganizations()[0];
@@ -610,6 +651,7 @@ export class AppShellComponent implements OnInit {
     this.selectedOrgId.set(orgId);
     const org = this.store.activeOrganizations().find((o) => o.id === orgId);
     if (org) {
+      this.closeOnMobile();
       void this.router.navigate(['/o', org.slug]);
     }
   }
@@ -630,6 +672,7 @@ export class AppShellComponent implements OnInit {
     const org = await this.store.createOrganization({ name: name.trim() });
     this.selectedOrgId.set(org.id);
     this.snackbar.open({ message: `Organización "${org.name}" creada.`, tone: 'success' });
+    this.closeOnMobile();
     await this.router.navigate(['/o', org.slug]);
   }
 
@@ -642,6 +685,7 @@ export class AppShellComponent implements OnInit {
     });
     const org = this.store.activeOrganizations().find((o) => o.id === orgId);
     this.snackbar.open({ message: `Espacio "${ws.name}" creado.`, tone: 'success' });
+    this.closeOnMobile();
     if (org) {
       await this.router.navigate(['/o', org.slug, ws.slug]);
     }
@@ -669,7 +713,7 @@ export class AppShellComponent implements OnInit {
   }
 
   protected closeOnMobile(): void {
-    if (typeof window !== 'undefined' && window.innerWidth <= 860) {
+    if (this.isMobile()) {
       this.sidebarOpen.set(false);
     }
   }
