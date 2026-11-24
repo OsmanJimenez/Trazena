@@ -5,7 +5,7 @@
   "scripts": {
     "start": "ng serve",
     "build": "ng build --configuration=production",
-    "build:pages": "ng build --configuration=production --base-href=/Trazena/",
+    "build:pages": "ng build --configuration=production --base-href=/",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
