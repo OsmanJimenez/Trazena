@@ -229,25 +229,100 @@ export class TrazenaSyncService {
         );
 
       if (pending.length > 0) {
+        // Ensure any parent organization / workspace referenced by pending mutations (e.g. locally seeded orgs)
+        // is included ahead of its children so the server always has full metadata and ownership rows.
+        const pendingOrgIds = new Set(
+          pending.filter((m) => m.entityType === 'organization').map((m) => m.entityId),
+        );
+        const pendingWsIds = new Set(
+          pending.filter((m) => m.entityType === 'workspace').map((m) => m.entityId),
+        );
+        const neededOrgIds = new Set<string>();
+        const neededWsIds = new Set<string>();
+        for (const m of pending) {
+          const orgId = typeof m.payload['organizationId'] === 'string' ? m.payload['organizationId'] : '';
+          const wsId = typeof m.payload['workspaceId'] === 'string' ? m.payload['workspaceId'] : '';
+          if (orgId && !pendingOrgIds.has(orgId)) neededOrgIds.add(orgId);
+          if (wsId && !pendingWsIds.has(wsId)) neededWsIds.add(wsId);
+        }
+
+        const prerequisiteOps: Array<{
+          operationId: string;
+          entityType: LocalMutation['entityType'];
+          entityId: string;
+          operation: LocalMutation['operation'];
+          baseRevision: number | null;
+          payload: Record<string, unknown>;
+          createdAt: string;
+        }> = [];
+
+        for (const orgId of neededOrgIds) {
+          const org = await this.idb.getByKey<import('@trazena/shared').Organization>('organizations', orgId);
+          if (org) {
+            prerequisiteOps.push({
+              operationId: `prereq:org:${org.id}:${org.updatedAt}`,
+              entityType: 'organization',
+              entityId: org.id,
+              operation: 'update',
+              baseRevision: null,
+              payload: {
+                name: org.name,
+                slug: org.slug,
+                description: org.description,
+                icon: org.icon,
+                position: org.position,
+                status: org.status,
+              },
+              createdAt: org.createdAt,
+            });
+          }
+        }
+        for (const wsId of neededWsIds) {
+          const ws = await this.idb.getByKey<import('@trazena/shared').Workspace>('workspaces', wsId);
+          if (ws) {
+            prerequisiteOps.push({
+              operationId: `prereq:ws:${ws.id}:${ws.updatedAt}`,
+              entityType: 'workspace',
+              entityId: ws.id,
+              operation: 'update',
+              baseRevision: null,
+              payload: {
+                organizationId: ws.organizationId,
+                name: ws.name,
+                slug: ws.slug,
+                description: ws.description,
+                icon: ws.icon,
+                position: ws.position,
+                status: ws.status,
+              },
+              createdAt: ws.createdAt,
+            });
+          }
+        }
+
         this._phaseLabel.set(`Enviando ${pending.length} cambio(s) locales…`);
         const pushRes = await firstValueFrom(
           this.http.post<SyncPushResponse>(`${this.apiUrl}/api/sync/push`, {
             deviceId: device.deviceId,
             deviceName: device.name,
             appVersion: APP_BUILD_META.appVersion,
-            operations: pending.map((m) => ({
-              operationId: m.operationId,
-              entityType: m.entityType,
-              entityId: m.entityId,
-              operation: m.operation,
-              baseRevision: m.baseRevision,
-              payload: m.payload,
-              createdAt: m.createdAt,
-            })),
+            operations: [
+              ...prerequisiteOps,
+              ...pending.map((m) => ({
+                operationId: m.operationId,
+                entityType: m.entityType,
+                entityId: m.entityId,
+                operation: m.operation,
+                baseRevision: m.baseRevision,
+                payload: m.payload,
+                createdAt: m.createdAt,
+              })),
+            ],
           }),
         );
 
         const confirmedIds: string[] = [];
+        const rejectedErrors: string[] = [];
         const byOpId = new Map(pending.map((m) => [m.operationId, m]));
 
         for (const r of pushRes.results) {
@@ -293,10 +368,18 @@ export class TrazenaSyncService {
               resolved: false,
             };
             await this.idb.saveConflict(conflictRecord);
+          } else if (r.status === 'rejected') {
+            rejectedErrors.push(`${orig.entityType}:${orig.entityId} (${r.error ?? r.status})`);
           }
         }
 
         await this.idb.removeOutboxOperations(confirmedIds);
+
+        if (rejectedErrors.length > 0 && confirmedIds.length === 0) {
+          throw new Error(
+            `El servidor rechazó ${rejectedErrors.length} operación(es): ${rejectedErrors.slice(0, 2).join(', ')}`,
+          );
+        }
       }
 
       // 3. Incremental pull from checkpoint cursor

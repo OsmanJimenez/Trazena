@@ -201,6 +201,113 @@ async function saveSnapshotAndRotate(
   }
 }
 
+const SEEDED_ORGS: Record<string, { name: string; slug: string; description: string; icon: string }> = {
+  'org-trazena': {
+    name: 'Trazena',
+    slug: 'trazena',
+    description: 'Guía oficial, características y arquitectura Local-First de Trazena.',
+    icon: 'layers',
+  },
+  'org-personal': {
+    name: 'Personal',
+    slug: 'personal',
+    description: 'Espacio personal para notas rápidas, aprendizaje e ideas.',
+    icon: 'folder',
+  },
+};
+
+const SEEDED_WORKSPACES: Record<string, { name: string; slug: string; description: string; icon: string }> = {
+  'ws-guia': {
+    name: 'Guía de uso',
+    slug: 'guia-de-uso',
+    description: 'Cómo organizar tu conocimiento, usar el editor Markdown y sincronizar.',
+    icon: 'book',
+  },
+  'ws-notas': {
+    name: 'Notas',
+    slug: 'notas',
+    description: 'Apuntes personales, listas de tareas e ideas diarias.',
+    icon: 'book',
+  },
+};
+
+/**
+ * Verifies the authenticated user can write to `orgId`.
+ * If `orgId` does not exist yet in D1 (e.g. a locally seeded default org or offline-created org),
+ * provisions it under the authenticated owner so child workspace/page syncs succeed seamlessly.
+ */
+async function ensureOrgWriteAccess(
+  db: D1Database,
+  orgId: string,
+  userId: string,
+  now: string,
+): Promise<boolean> {
+  if (!orgId) return false;
+  const role = await getOrganizationRole(db, orgId, userId);
+  if (canWrite(role)) return true;
+
+  const existing = await db
+    .prepare(`SELECT id FROM organizations WHERE id = ?`)
+    .bind(orgId)
+    .first<{ id: string }>();
+  if (existing) return false;
+
+  const seed = SEEDED_ORGS[orgId] ?? {
+    name: orgId === 'org-trazena' ? 'Trazena' : 'Organización',
+    slug: orgId.slice(0, 32),
+    description: '',
+    icon: 'folder',
+  };
+
+  await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO organizations
+          (id, owner_id, name, slug, description, icon, position, status, created_at, updated_at, created_by, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, '0000001000', 'active', ?, ?, ?, ?)`,
+      )
+      .bind(orgId, userId, seed.name, seed.slug, seed.description || null, seed.icon, now, now, userId, userId),
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO organization_members (organization_id, user_id, role, created_at)
+         VALUES (?, ?, 'owner', ?)`,
+      )
+      .bind(orgId, userId, now),
+  ]);
+  return true;
+}
+
+async function ensureWorkspaceExists(
+  db: D1Database,
+  wsId: string,
+  orgId: string,
+  userId: string,
+  now: string,
+): Promise<void> {
+  if (!wsId || !orgId) return;
+  const existing = await db
+    .prepare(`SELECT id FROM workspaces WHERE id = ?`)
+    .bind(wsId)
+    .first<{ id: string }>();
+  if (existing) return;
+
+  const seed = SEEDED_WORKSPACES[wsId] ?? {
+    name: 'General',
+    slug: wsId.slice(0, 32),
+    description: '',
+    icon: 'book',
+  };
+
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO workspaces
+        (id, organization_id, name, slug, description, icon, position, status, created_at, updated_at, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, '0000001000', 'active', ?, ?, ?, ?)`,
+    )
+    .bind(wsId, orgId, seed.name, seed.slug, seed.description || null, seed.icon, now, now, userId, userId)
+    .run();
+}
+
 export const syncRoutes = new Hono<AppContext>();
 
 syncRoutes.post('/sync/push', async (c) => {
@@ -331,8 +438,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'workspace') {
         const p = op.payload as Record<string, string | null | undefined>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({
             operationId: op.operationId,
             entityType: op.entityType,
@@ -407,8 +513,7 @@ syncRoutes.post('/sync/push', async (c) => {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
         const wsId = String(p['workspaceId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({
             operationId: op.operationId,
             entityType: op.entityType,
@@ -418,6 +523,7 @@ syncRoutes.post('/sync/push', async (c) => {
           });
           continue;
         }
+        await ensureWorkspaceExists(c.env.DB, wsId, orgId, user.id, now);
 
         const existingPage = await c.env.DB.prepare(`SELECT * FROM pages WHERE id = ?`)
           .bind(op.entityId)
@@ -594,8 +700,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'tag') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -610,8 +715,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'page_tag') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -628,8 +732,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'property_definition') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -644,8 +747,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'property_value') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -696,8 +798,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'reminder') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -730,8 +831,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'daily_note') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
@@ -746,8 +846,7 @@ syncRoutes.post('/sync/push', async (c) => {
       } else if (op.entityType === 'page_review') {
         const p = op.payload as Record<string, unknown>;
         const orgId = String(p['organizationId'] ?? '');
-        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
-        if (!canWrite(role)) {
+        if (!(await ensureOrgWriteAccess(c.env.DB, orgId, user.id, now))) {
           results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
           continue;
         }
