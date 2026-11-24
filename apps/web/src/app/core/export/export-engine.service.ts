@@ -479,8 +479,25 @@ export class ExportEngineService {
 
   // --- Markdown Adapter + ZIP ---
 
+  private computeRelativeExportHref(
+    fromFolderSegments: string[],
+    target: ExportDocNode,
+    ext: 'md' | 'html',
+  ): string {
+    const fromParts = fromFolderSegments;
+    const toParts = target.folderSegments;
+    let common = 0;
+    while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
+      common++;
+    }
+    const up = Array(fromParts.length - common).fill('..');
+    const down = toParts.slice(common);
+    return [...up, ...down, `${target.fileBaseName}.${ext}`].join('/');
+  }
+
   private resolveInternalLinksForExport(
     markdown: string,
+    sourceNode: ExportDocNode,
     snapshot: ExportSnapshot,
     ext: 'md' | 'html',
   ): string {
@@ -488,7 +505,7 @@ export class ExportEngineService {
     const replacer = (_full: string, label: string, targetId: string) => {
       const target = nodeById.get(targetId);
       if (!target) return label;
-      const targetPath = [...target.folderSegments, `${target.fileBaseName}.${ext}`].join('/');
+      const targetPath = this.computeRelativeExportHref(sourceNode.folderSegments, target, ext);
       return `[${label}](${targetPath})`;
     };
     return markdown
@@ -503,7 +520,7 @@ export class ExportEngineService {
   ): string {
     const body = singleFile
       ? node.page.content.markdown
-      : this.resolveInternalLinksForExport(node.page.content.markdown, snapshot, 'md');
+      : this.resolveInternalLinksForExport(node.page.content.markdown, node, snapshot, 'md');
     if (!snapshot.request.includeMetadata) return body;
 
     const tagNames = node.tags.map((t) => t.name);
@@ -568,6 +585,7 @@ export class ExportEngineService {
   ): string {
     const resolvedMd = this.resolveInternalLinksForExport(
       node.page.content.markdown,
+      node,
       snapshot,
       'html',
     );
@@ -654,7 +672,19 @@ export class ExportEngineService {
 
   // --- PDF Adapter (Real Selectable-Text A4 PDF via jsPDF + autoTable) ---
 
-  private renderMarkdownToPdf(doc: jsPDF, node: ExportDocNode, startY: number): number {
+  private renderMarkdownToPdf(
+    doc: jsPDF,
+    node: ExportDocNode,
+    startY: number,
+    pendingInternalLinks?: Array<{
+      sourcePage: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      targetPageId: string;
+    }>,
+  ): number {
     const marginX = 18;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -874,13 +904,20 @@ export class ExportEngineService {
         continue;
       }
 
-      // Lists, checklists, or normal paragraph
+      // Lists, checklists, or normal paragraph (with clickable internal & external links)
+      const linkMatches: Array<{ label: string; href: string }> = [];
+      const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+      let lm: RegExpExecArray | null;
+      while ((lm = linkRe.exec(trimmed)) !== null) {
+        linkMatches.push({ label: pdfSafeText(lm[1]), href: lm[2].trim() });
+      }
+
       const cleaned = pdfSafeText(
         trimmed
           .replace(/^-\s+\[x\]\s+/i, '[x] ')
           .replace(/^-\s+\[\s\]\s+/, '[ ] ')
           .replace(/^[-*]\s+/, '- ')
-          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
           .replace(/[*_`~]/g, ''),
       );
       doc.setFont('helvetica', 'normal');
@@ -889,7 +926,39 @@ export class ExportEngineService {
       const pLines = doc.splitTextToSize(cleaned, maxWidth) as string[];
       for (const pl of pLines) {
         ensureSpace(6);
-        doc.text(pl, marginX, y);
+        const currentPageNum = doc.getCurrentPageInfo().pageNumber;
+        if (linkMatches.length > 0 && linkMatches.some((m) => pl.includes(m.label))) {
+          // Highlight and attach clickable PDF link annotations for each matched link on this line
+          doc.text(pl, marginX, y);
+          for (const m of linkMatches) {
+            const idx = pl.indexOf(m.label);
+            if (idx === -1) continue;
+            const prefixW = doc.getTextWidth(pl.slice(0, idx));
+            const labelW = Math.max(8, doc.getTextWidth(m.label));
+            const linkX = marginX + prefixW;
+            doc.setTextColor(15, 118, 110);
+            doc.text(m.label, linkX, y);
+            doc.setDrawColor(15, 118, 110);
+            doc.setLineWidth(0.2);
+            doc.line(linkX, y + 0.8, linkX + labelW, y + 0.8);
+            doc.setTextColor(35, 35, 35);
+
+            if (m.href.startsWith('trazena://page/') && pendingInternalLinks) {
+              pendingInternalLinks.push({
+                sourcePage: currentPageNum,
+                x: linkX,
+                y: y - 3.6,
+                w: labelW,
+                h: 4.8,
+                targetPageId: m.href.slice('trazena://page/'.length),
+              });
+            } else if (/^https?:\/\//i.test(m.href)) {
+              doc.link(linkX, y - 3.6, labelW, 4.8, { url: m.href });
+            }
+          }
+        } else {
+          doc.text(pl, marginX, y);
+        }
         y += 5;
       }
       y += 1.5;
@@ -915,46 +984,111 @@ export class ExportEngineService {
   private async generateCombinedPdf(snapshot: ExportSnapshot): Promise<Blob> {
     this._progress.update((p) => ({ ...p, phase: 'generating', message: 'Generando documento PDF…' }));
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const marginX = 18;
+    const maxWidth = pageWidth - marginX * 2;
 
     const multi = snapshot.nodes.length > 1;
-    if (multi && snapshot.request.includeCoverPage !== false) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(24);
-      doc.setTextColor(25, 25, 25);
-      doc.text(pdfSafeText(snapshot.title), 18, 65);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.setTextColor(100, 100, 95);
-      doc.text(
-        pdfSafeText(
-          `Exportado desde Trazena · ${snapshot.nodes.length} páginas · ${new Date().toLocaleDateString()}`,
-        ),
-        18,
-        76,
-      );
+    const hasCover = multi && snapshot.request.includeCoverPage !== false;
+    const pageStartById = new Map<string, number>();
+    const pendingInternalLinks: Array<{
+      sourcePage: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      targetPageId: string;
+    }> = [];
 
-      if (snapshot.request.includeToc !== false) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(13);
-        doc.setTextColor(25, 25, 25);
-        doc.text('Índice', 18, 98);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        let tocY = 107;
-        for (const n of snapshot.nodes.slice(0, 35)) {
-          if (tocY > 270) break;
-          doc.text(pdfSafeText(`${'  '.repeat(n.depth)}- ${n.page.title}`), 20, tocY);
-          tocY += 5.5;
-        }
-      }
+    // Reserve page 1 for Cover + Clickable Table of Contents when exporting multiple documents
+    if (hasCover) {
       doc.addPage();
     }
 
     for (let i = 0; i < snapshot.nodes.length; i++) {
       if (this.cancelled) throw new Error('Cancelado');
       if (i > 0) doc.addPage();
-      this.renderMarkdownToPdf(doc, snapshot.nodes[i], 20);
+      const startPageNum = doc.getCurrentPageInfo().pageNumber;
+      pageStartById.set(snapshot.nodes[i].page.id, startPageNum);
+      this.renderMarkdownToPdf(doc, snapshot.nodes[i], 20, pendingInternalLinks);
       this._progress.update((p) => ({ ...p, processedPages: i + 1 }));
+    }
+
+    // Resolve internal trazena://page/<id> links inside the PDF to their actual target page numbers
+    for (const ref of pendingInternalLinks) {
+      const targetPageNum = pageStartById.get(ref.targetPageId);
+      if (!targetPageNum) continue;
+      doc.setPage(ref.sourcePage);
+      doc.link(ref.x, ref.y, ref.w, ref.h, { pageNumber: targetPageNum });
+    }
+
+    // Now render Page 1 Cover + Clickable TOC with exact page numbers
+    if (hasCover) {
+      doc.setPage(1);
+      // Top accent ribbon
+      doc.setFillColor(15, 118, 110);
+      doc.rect(0, 0, pageWidth, 4, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(24);
+      doc.setTextColor(25, 25, 25);
+      const coverTitleLines = doc.splitTextToSize(pdfSafeText(snapshot.title), maxWidth) as string[];
+      doc.text(coverTitleLines, marginX, 42);
+
+      const subtitleY = 42 + coverTitleLines.length * 9 + 2;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10.5);
+      doc.setTextColor(100, 100, 95);
+      doc.text(
+        pdfSafeText(
+          `Exportado desde Trazena · ${snapshot.nodes.length} páginas · ${new Date().toLocaleDateString()}`,
+        ),
+        marginX,
+        subtitleY,
+      );
+
+      doc.setDrawColor(220, 220, 215);
+      doc.setLineWidth(0.35);
+      doc.line(marginX, subtitleY + 6, pageWidth - marginX, subtitleY + 6);
+
+      if (snapshot.request.includeToc !== false) {
+        let tocY = subtitleY + 18;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(25, 25, 25);
+        doc.text('Índice de contenido (clic para ir al tema)', marginX, tocY);
+        tocY += 9;
+
+        for (const n of snapshot.nodes) {
+          if (tocY > 272) break;
+          const targetPage = pageStartById.get(n.page.id) ?? 2;
+          const indentX = marginX + Math.min(n.depth, 5) * 6;
+          const pageLabel = `p. ${targetPage}`;
+
+          doc.setFont('helvetica', n.depth === 0 ? 'bold' : 'normal');
+          doc.setFontSize(n.depth === 0 ? 10 : 9.5);
+          doc.setTextColor(15, 118, 110);
+
+          const labelText = pdfSafeText(n.page.title);
+          doc.text(labelText, indentX, tocY);
+
+          // Subtle dotted leader + right-aligned target page number
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.setTextColor(120, 120, 115);
+          doc.text(pageLabel, pageWidth - marginX, tocY, { align: 'right' });
+
+          doc.setDrawColor(235, 235, 230);
+          doc.setLineWidth(0.2);
+          doc.line(indentX, tocY + 1.5, pageWidth - marginX, tocY + 1.5);
+
+          // Real clickable PDF internal link jumping straight to targetPage
+          doc.link(indentX, tocY - 4, pageWidth - marginX - indentX, 5.8, {
+            pageNumber: targetPage,
+          });
+          tocY += 6.5;
+        }
+      }
     }
 
     this.addPdfPageNumbers(doc);

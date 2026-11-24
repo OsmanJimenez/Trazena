@@ -305,20 +305,24 @@ const SLASH_COMMANDS: readonly SlashCommandItem[] = [
     }
     .draft-actions { display: flex; flex-direction: row !important; gap: 0.35rem; }
 
+    /* Level 3b Ribbon: Lightweight inline editor formatting bar */
     .editor-bar {
       position: sticky; top: 0; z-index: 10;
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.45rem;
-      padding: 0.4rem 0.55rem; border: 1px solid var(--trz-border); border-radius: var(--trz-radius-md);
-      background: color-mix(in srgb, var(--trz-bg) 94%, transparent); backdrop-filter: blur(8px);
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--trz-border);
+      border-radius: var(--trz-radius-sm);
+      background: var(--trz-bg-subtle);
     }
 
     .mode-switch {
-      display: inline-flex; border: 1px solid var(--trz-border); border-radius: var(--trz-radius-sm); overflow: hidden;
+      display: inline-flex; padding: 2px; border: 1px solid var(--trz-border-strong);
+      border-radius: var(--trz-radius-sm); background: var(--trz-bg);
     }
     .mode-btn {
       appearance: none; border: 0; background: transparent; color: var(--trz-text-muted);
-      font: inherit; font-size: 0.75rem; font-weight: 500; padding: 0.24rem 0.55rem; cursor: pointer;
-      &.active { background: var(--trz-text); color: var(--trz-bg); font-weight: 600; }
+      font: inherit; font-size: 0.73rem; font-weight: 500; padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer;
+      &.active { background: var(--trz-accent); color: #fff; font-weight: 600; }
     }
 
     .bar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.12rem; flex: 1; }

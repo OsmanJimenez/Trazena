@@ -52,49 +52,54 @@ import { PageKnowledgePanelComponent } from './page-knowledge-panel.component';
           <div class="doc-header-bar">
             <trz-page-breadcrumbs [segments]="data.breadcrumbs" />
             <div class="doc-actions">
-              <button
-                atrButton
-                type="button"
-                size="small"
-                appearance="text"
-                [title]="meta.isFavorite(page.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
-                (click)="toggleFavorite(page.id)"
-              >
-                {{ meta.isFavorite(page.id) ? '★ Favorito' : '☆ Favorito' }}
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="knowledgeOpen.set(!knowledgeOpen())">
-                {{ knowledgeOpen() ? 'Ocultar propiedades' : 'Propiedades / TOC' }}
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="openInSplit(page, data.canonicalPath)">
-                Dividir
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="markAsReviewed(page)">
-                Revisado
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="openExport(page)">
-                Exportar
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="saveAsTemplate(page)">
-                Plantilla
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="historyOpen.set(!historyOpen())">
-                Historial
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="createSubpage()">
-                + Subpágina
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="duplicatePage()">
-                Duplicar
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="toggleMovePanel()">
-                Mover
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="archivePage()">
-                Archivar
-              </button>
-              <button atrButton type="button" size="small" appearance="text" (click)="trashPage()">
-                Papelera
-              </button>
+              <div class="doc-actions-primary">
+                <button
+                  atrButton
+                  type="button"
+                  size="small"
+                  appearance="outlined"
+                  [title]="meta.isFavorite(page.id) ? 'Quitar de favoritos' : 'Añadir a favoritos'"
+                  (click)="toggleFavorite(page.id)"
+                >
+                  {{ meta.isFavorite(page.id) ? '★ Favorito' : '☆ Favorito' }}
+                </button>
+                <button atrButton type="button" size="small" appearance="outlined" (click)="openExport(page)">
+                  Exportar
+                </button>
+                <button atrButton type="button" size="small" appearance="outlined" (click)="openInSplit(page, data.canonicalPath)">
+                  Dividir
+                </button>
+              </div>
+              <span class="doc-actions-sep" aria-hidden="true"></span>
+              <div class="doc-actions-secondary">
+                <button atrButton type="button" size="small" appearance="text" (click)="knowledgeOpen.set(!knowledgeOpen())">
+                  {{ knowledgeOpen() ? 'Ocultar propiedades' : 'Propiedades / TOC' }}
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="markAsReviewed(page)">
+                  Revisado
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="saveAsTemplate(page)">
+                  Plantilla
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="historyOpen.set(!historyOpen())">
+                  Historial
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="createSubpage()">
+                  + Subpágina
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="duplicatePage()">
+                  Duplicar
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="toggleMovePanel()">
+                  Mover
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="archivePage()">
+                  Archivar
+                </button>
+                <button atrButton type="button" size="small" appearance="text" (click)="trashPage()">
+                  Papelera
+                </button>
+              </div>
             </div>
           </div>
 
@@ -190,19 +195,37 @@ import { PageKnowledgePanelComponent } from './page-knowledge-panel.component';
       gap: 1.25rem;
     }
 
+    /* Level 3a Ribbon: Document contextual actions */
     .doc-header-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 0.5rem 1rem;
+      gap: 0.6rem 1rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--trz-border);
     }
 
     .doc-actions {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 0.15rem;
+      gap: 0.35rem;
+    }
+
+    .doc-actions-primary,
+    .doc-actions-secondary {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .doc-actions-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--trz-border-strong);
+      margin: 0 0.15rem;
     }
 
     .doc-title-block {

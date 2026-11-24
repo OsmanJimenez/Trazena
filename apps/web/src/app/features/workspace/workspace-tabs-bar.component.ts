@@ -108,12 +108,13 @@ import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.servic
     }
   `,
   styles: `
+    /* Level 2 Ribbon: Open document tabs strip (recessed beneath global topbar) */
     .tabs-bar {
       display: flex;
-      align-items: center;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 0.5rem;
-      padding: 0.25rem 0.75rem;
+      padding: 0.25rem 0.85rem 0;
       border-bottom: 1px solid var(--trz-border);
       background: var(--trz-bg-sidebar);
       min-height: 36px;
@@ -122,8 +123,8 @@ import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.servic
 
     .tabs-scroll {
       display: flex;
-      align-items: center;
-      gap: 0.25rem;
+      align-items: flex-end;
+      gap: 0.2rem;
       overflow-x: auto;
       min-width: 0;
       flex: 1;
@@ -135,14 +136,15 @@ import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.servic
       align-items: center;
       gap: 0.15rem;
       max-width: 210px;
-      padding: 0.15rem 0.3rem 0.15rem 0.45rem;
+      padding: 0.24rem 0.35rem 0.28rem 0.55rem;
       border: 1px solid transparent;
-      border-radius: var(--trz-radius-sm);
+      border-bottom: 0;
+      border-radius: var(--trz-radius-sm) var(--trz-radius-sm) 0 0;
       background: transparent;
-      color: var(--trz-text-muted);
-      font-size: 0.78rem;
+      color: var(--trz-text-subtle);
+      font-size: 0.76rem;
       flex-shrink: 0;
-      transition: background 120ms ease, border-color 120ms ease;
+      transition: background 120ms ease, color 120ms ease;
 
       &:hover {
         background: var(--trz-bg-hover);
@@ -152,8 +154,11 @@ import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.servic
       &.active {
         background: var(--trz-bg);
         border-color: var(--trz-border);
+        border-top: 2px solid var(--trz-accent);
         color: var(--trz-text);
         font-weight: 600;
+        margin-bottom: -1px;
+        padding-bottom: calc(0.28rem + 1px);
       }
     }
 

@@ -740,16 +740,18 @@ import { WorkspaceTabsBarComponent } from '../features/workspace/workspace-tabs-
       background: var(--trz-bg);
     }
 
+    /* Level 1 Ribbon: Global application chrome */
     .topbar {
-      height: var(--trz-topbar-height);
+      height: 52px;
       padding: 0 1.25rem;
-      border-bottom: 1px solid var(--trz-border);
-      background: var(--trz-bg);
+      border-bottom: 1px solid var(--trz-border-strong);
+      background: var(--trz-bg-elevated);
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
       flex-shrink: 0;
+      z-index: 15;
     }
 
     .topbar-left,
