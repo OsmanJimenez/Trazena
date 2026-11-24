@@ -206,6 +206,34 @@ export class KnowledgeMetaService {
     await this.sync.refreshState();
   }
 
+  async ensureTag(orgId: string, name: string, color?: string): Promise<Tag> {
+    return this.createOrGetTag(orgId, name, color);
+  }
+
+  async deleteTag(tagId: string): Promise<void> {
+    const current = this._tags().find((t) => t.id === tagId);
+    if (!current) return;
+    const uid = this.ownerUid;
+    const device = await this.idb.getOrCreateDevice(uid);
+    const now = new Date().toISOString();
+    const deleted: Tag = { ...current, status: 'deleted', updatedAt: now };
+    await this.idb.commitAtomicWithOutbox('tags', deleted, {
+      operationId: crypto.randomUUID(),
+      deviceId: device.deviceId,
+      ownerUid: uid,
+      entityType: 'tag',
+      entityId: deleted.id,
+      operation: 'delete',
+      baseRevision: null,
+      payload: { ...deleted },
+      createdAt: now,
+      updatedAt: now,
+      status: 'pending',
+    });
+    this._tags.update((list) => list.filter((t) => t.id !== tagId));
+    await this.sync.refreshState();
+  }
+
   async assignTagToPage(page: Pick<Page, 'id' | 'organizationId'>, tagId: string): Promise<void> {
     const id = `${page.id}:${tagId}`;
     if (this._pageTags().some((pt) => pt.id === id)) return;

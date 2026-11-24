@@ -46,6 +46,9 @@ const pushSchema = z.object({
           'saved_view',
           'template',
           'favorite',
+          'reminder',
+          'daily_note',
+          'page_review',
         ]),
         entityId: z.string().min(1).max(120),
         operation: z.enum(['create', 'update', 'move', 'archive', 'restore', 'delete']),
@@ -689,6 +692,69 @@ syncRoutes.post('/sync/push', async (c) => {
             .bind(op.entityId, user.id, String(p['pageId'] ?? ''), op.createdAt)
             .run();
         }
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'reminder') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        if (op.operation === 'delete') {
+          await c.env.DB.prepare(`DELETE FROM page_reminders WHERE id = ? AND user_id = ?`).bind(op.entityId, user.id).run();
+        } else {
+          await c.env.DB.prepare(
+            `INSERT INTO page_reminders (id, user_id, organization_id, workspace_id, page_id, title, due_date, due_time, status, snoozed_until, completed_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET title = excluded.title, due_date = excluded.due_date, due_time = excluded.due_time, status = excluded.status, snoozed_until = excluded.snoozed_until, completed_at = excluded.completed_at, updated_at = excluded.updated_at`,
+          )
+            .bind(
+              op.entityId,
+              user.id,
+              orgId,
+              String(p['workspaceId'] ?? ''),
+              String(p['pageId'] ?? ''),
+              String(p['title'] ?? ''),
+              String(p['dueDate'] ?? ''),
+              (p['dueTime'] as string | null) ?? null,
+              String(p['status'] ?? 'pending'),
+              (p['snoozedUntil'] as string | null) ?? null,
+              (p['completedAt'] as string | null) ?? null,
+              op.createdAt,
+              now,
+            )
+            .run();
+        }
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'daily_note') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        await c.env.DB.prepare(
+          `INSERT INTO daily_notes (id, organization_id, workspace_id, page_id, note_date, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET page_id = excluded.page_id, updated_at = excluded.updated_at`,
+        )
+          .bind(op.entityId, orgId, String(p['workspaceId'] ?? ''), String(p['pageId'] ?? ''), String(p['noteDate'] ?? ''), op.createdAt, now)
+          .run();
+        results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
+      } else if (op.entityType === 'page_review') {
+        const p = op.payload as Record<string, unknown>;
+        const orgId = String(p['organizationId'] ?? '');
+        const role = await getOrganizationRole(c.env.DB, orgId, user.id);
+        if (!canWrite(role)) {
+          results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'rejected', error: 'FORBIDDEN' });
+          continue;
+        }
+        // Update review date metadata ONLY — never creates a Markdown history snapshot
+        await c.env.DB.prepare(`UPDATE pages SET last_reviewed_at = ? WHERE id = ?`)
+          .bind(String(p['lastReviewedAt'] ?? now), op.entityId)
+          .run();
         results.push({ operationId: op.operationId, entityType: op.entityType, entityId: op.entityId, status: 'applied' });
       }
     } catch (err) {

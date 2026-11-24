@@ -20,6 +20,9 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       <a routerLink="/settings/updates" routerLinkActive="active">
         Actualizaciones y diagnóstico
       </a>
+      <a routerLink="/settings/shortcuts" routerLinkActive="active">
+        Atajos de teclado
+      </a>
     </nav>
   `,
   styles: `

@@ -75,10 +75,45 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'import',
+        loadComponent: () =>
+          import('./features/import/import-wizard.component').then(
+            (m) => m.ImportWizardComponent,
+          ),
+      },
+      {
+        path: 'health',
+        loadComponent: () =>
+          import('./features/health/knowledge-health.component').then(
+            (m) => m.KnowledgeHealthComponent,
+          ),
+      },
+      {
+        path: 'daily',
+        loadComponent: () =>
+          import('./features/daily/daily-notes-view.component').then(
+            (m) => m.DailyNotesViewComponent,
+          ),
+      },
+      {
+        path: 'reminders',
+        loadComponent: () =>
+          import('./features/reminders/reminders-view.component').then(
+            (m) => m.RemindersViewComponent,
+          ),
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings.component').then(
             (m) => m.SettingsComponent,
+          ),
+      },
+      {
+        path: 'settings/shortcuts',
+        loadComponent: () =>
+          import('./features/settings/shortcuts-settings.component').then(
+            (m) => m.ShortcutsSettingsComponent,
           ),
       },
       {

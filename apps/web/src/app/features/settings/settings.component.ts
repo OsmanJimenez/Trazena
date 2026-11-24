@@ -65,18 +65,28 @@ import { SettingsNavComponent } from './settings-nav.component';
 
       <atr-card appearance="outlined">
         <div class="card-inner">
-          <h2>Papelera ({{ store.deletedPages().length }})</h2>
+          <h2>Papelera — Páginas ({{ store.deletedPages().length }})</h2>
           @if (store.deletedPages().length > 0) {
             <div class="trash-list">
               @for (page of store.deletedPages(); track page.id) {
                 <div class="trash-row">
                   <div>
                     <div class="trash-title">{{ page.title }}</div>
-                    <div class="trash-meta">Slug: /{{ page.slug }}</div>
+                    <div class="trash-meta">
+                      Slug: /{{ page.slug }}
+                      @if (deletedChildrenCount(page.id) > 0) {
+                        · +{{ deletedChildrenCount(page.id) }} subpágina(s)
+                      }
+                    </div>
                   </div>
                   <div class="trash-actions">
+                    @if (deletedChildrenCount(page.id) > 0) {
+                      <button atrButton type="button" size="small" appearance="filled" (click)="restoreBranch(page.id, page.title)">
+                        Restaurar rama
+                      </button>
+                    }
                     <button atrButton type="button" size="small" appearance="outlined" (click)="restore(page.id)">
-                      Restaurar
+                      Restaurar página
                     </button>
                     <button atrButton type="button" size="small" appearance="text" (click)="purge(page.id, page.title)">
                       Eliminar definitivo
@@ -88,12 +98,44 @@ import { SettingsNavComponent } from './settings-nav.component';
           } @else {
             <atr-empty-state
               appearance="compact"
-              title="La papelera está vacía"
-              description="Las páginas eliminadas aparecerán aquí para poder restaurarlas."
+              title="La papelera de páginas está vacía"
+              description="Las páginas eliminadas aparecerán aquí para poder restaurarlas individualmente o por rama."
             />
           }
         </div>
       </atr-card>
+
+      @if (store.deletedWorkspaces().length > 0 || store.deletedOrganizations().length > 0) {
+        <atr-card appearance="outlined">
+          <div class="card-inner">
+            <h2>Espacios y organizaciones eliminados</h2>
+            <div class="trash-list">
+              @for (ws of store.deletedWorkspaces(); track ws.id) {
+                <div class="trash-row">
+                  <div>
+                    <div class="trash-title">Espacio: {{ ws.name }}</div>
+                    <div class="trash-meta">Slug: /{{ ws.slug }}</div>
+                  </div>
+                  <button atrButton type="button" size="small" appearance="outlined" (click)="restoreWs(ws.id)">
+                    Restaurar espacio
+                  </button>
+                </div>
+              }
+              @for (org of store.deletedOrganizations(); track org.id) {
+                <div class="trash-row">
+                  <div>
+                    <div class="trash-title">Organización: {{ org.name }}</div>
+                    <div class="trash-meta">Slug: /o/{{ org.slug }}</div>
+                  </div>
+                  <button atrButton type="button" size="small" appearance="outlined" (click)="restoreOrg(org.id)">
+                    Restaurar organización
+                  </button>
+                </div>
+              }
+            </div>
+          </div>
+        </atr-card>
+      }
     </div>
   `,
   styles: `
@@ -140,9 +182,31 @@ export class SettingsComponent {
     { value: 'system', label: 'Sistema' },
   ];
 
+  protected deletedChildrenCount(pageId: string): number {
+    return this.store.deletedPages().filter((p) => p.parentId === pageId).length;
+  }
+
   protected async restore(pageId: string): Promise<void> {
     await this.store.restorePage(pageId);
     this.snackbar.open({ message: 'Página restaurada.', tone: 'success' });
+  }
+
+  protected async restoreBranch(pageId: string, title: string): Promise<void> {
+    const restored = await this.store.restorePageBranch(pageId);
+    this.snackbar.open({
+      message: `Rama "${title}" restaurada (${restored.length} documento(s)).`,
+      tone: 'success',
+    });
+  }
+
+  protected async restoreWs(workspaceId: string): Promise<void> {
+    await this.store.restoreWorkspace(workspaceId);
+    this.snackbar.open({ message: 'Espacio restaurado.', tone: 'success' });
+  }
+
+  protected async restoreOrg(orgId: string): Promise<void> {
+    await this.store.restoreOrganization(orgId);
+    this.snackbar.open({ message: 'Organización restaurada.', tone: 'success' });
   }
 
   protected async purge(pageId: string, title: string): Promise<void> {

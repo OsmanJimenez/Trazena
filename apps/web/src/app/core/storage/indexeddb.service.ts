@@ -17,7 +17,7 @@ import { APP_BUILD_META } from '../diagnostics/app-version';
 import { DiagnosticsService } from '../diagnostics/diagnostics.service';
 
 const DB_NAME = 'trazena_vault_v1';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const MAX_LOCAL_HISTORY_PER_PAGE = 3;
 
 export type StoreName =
@@ -41,6 +41,10 @@ export type StoreName =
   | 'templates'
   | 'favorites'
   | 'recent_visits'
+  | 'reminders'
+  | 'daily_notes'
+  | 'draft_recovery'
+  | 'review_policies'
   | 'meta';
 
 export interface MigrationProgressState {
@@ -240,6 +244,26 @@ export class IndexedDbService {
             if (!db.objectStoreNames.contains('recent_visits')) {
               const store = db.createObjectStore('recent_visits', { keyPath: 'id' });
               store.createIndex('by_owner', 'ownerUid', { unique: false });
+            }
+          }
+
+          // v4 Experience & Productivity stores (non-destructive expand)
+          if (oldVersion < 4) {
+            if (!db.objectStoreNames.contains('reminders')) {
+              const store = db.createObjectStore('reminders', { keyPath: 'id' });
+              store.createIndex('by_owner', 'ownerUid', { unique: false });
+              store.createIndex('by_page', 'pageId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('daily_notes')) {
+              const store = db.createObjectStore('daily_notes', { keyPath: 'id' });
+              store.createIndex('by_org', 'organizationId', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('draft_recovery')) {
+              const store = db.createObjectStore('draft_recovery', { keyPath: 'id' });
+              store.createIndex('by_owner', 'ownerUid', { unique: false });
+            }
+            if (!db.objectStoreNames.contains('review_policies')) {
+              db.createObjectStore('review_policies', { keyPath: 'organizationId' });
             }
           }
         } catch (err) {

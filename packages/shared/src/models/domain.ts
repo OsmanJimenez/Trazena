@@ -66,6 +66,7 @@ export interface Page {
   position: string;
   revision: number;
   status: EntityStatus;
+  lastReviewedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   createdBy: string;

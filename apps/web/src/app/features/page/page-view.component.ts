@@ -15,8 +15,10 @@ import { AtralumeEmptyState } from '@osmanjimenez/atralume/empty-state';
 import { AtralumeIcon } from '@osmanjimenez/atralume/icon';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { KnowledgeMetaService } from '../../core/knowledge/knowledge-meta.service';
+import { KnowledgeHealthService } from '../../core/productivity/knowledge-health.service';
 import { KnowledgeStore } from '../../core/state/knowledge.store';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
+import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.service';
 import { PageExportDialogComponent, type ExportDialogData } from '../export/page-export-dialog.component';
 import { PageBreadcrumbsComponent } from './page-breadcrumbs.component';
 import { PageEditorComponent } from './page-editor.component';
@@ -62,6 +64,12 @@ import { PageKnowledgePanelComponent } from './page-knowledge-panel.component';
               </button>
               <button atrButton type="button" size="small" appearance="text" (click)="knowledgeOpen.set(!knowledgeOpen())">
                 {{ knowledgeOpen() ? 'Ocultar propiedades' : 'Propiedades / TOC' }}
+              </button>
+              <button atrButton type="button" size="small" appearance="text" (click)="openInSplit(page, data.canonicalPath)">
+                Dividir
+              </button>
+              <button atrButton type="button" size="small" appearance="text" (click)="markAsReviewed(page)">
+                Revisado
               </button>
               <button atrButton type="button" size="small" appearance="text" (click)="openExport(page)">
                 Exportar
@@ -327,6 +335,8 @@ import { PageKnowledgePanelComponent } from './page-knowledge-panel.component';
 export class PageViewComponent {
   protected readonly store = inject(KnowledgeStore);
   protected readonly meta = inject(KnowledgeMetaService);
+  private readonly health = inject(KnowledgeHealthService);
+  private readonly tabs = inject(WorkspaceTabsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly snackbar = inject(AtralumeSnackbar);
@@ -393,6 +403,19 @@ export class PageViewComponent {
     this.titleDraft.set(res.page.title);
     await this.meta.initialize();
     void this.meta.recordRecentVisit(res.page.id);
+    this.tabs.openPageInTab(res.page, res.canonicalPath, { pane: 'left', activate: true });
+  }
+
+  protected openInSplit(page: { id: string; title: string; icon: string | null }, canonicalPath: string): void {
+    this.tabs.splitRight(page, canonicalPath);
+  }
+
+  protected async markAsReviewed(page: Parameters<KnowledgeHealthService['markPageReviewed']>[0]): Promise<void> {
+    await this.health.markPageReviewed(page);
+    this.snackbar.open({
+      message: 'Documento marcado como revisado hoy (sin alterar historial).',
+      tone: 'success',
+    });
   }
 
   protected async toggleFavorite(pageId: string): Promise<void> {

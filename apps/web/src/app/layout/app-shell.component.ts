@@ -19,13 +19,20 @@ import { AtralumeIconButton } from '@osmanjimenez/atralume/icon-button';
 import { AtralumeSnackbar } from '@osmanjimenez/atralume/snackbar';
 import { AuthService } from '../core/auth/auth.service';
 import { KnowledgeMetaService } from '../core/knowledge/knowledge-meta.service';
+import { DailyNotesService } from '../core/productivity/daily-notes.service';
+import { RemindersService } from '../core/productivity/reminders.service';
+import { ShortcutsService } from '../core/productivity/shortcuts.service';
 import { KnowledgeStore } from '../core/state/knowledge.store';
 import { ThemeService } from '../core/state/theme.service';
 import { TrazenaSyncService } from '../core/sync/trazena-sync.service';
 import { TrazenaUpdateService } from '../core/update/trazena-update.service';
 import { TrazenaDialogsService } from '../core/ui/trazena-dialogs.service';
+import { WorkspaceTabsService } from '../core/workspace/workspace-tabs.service';
+import { CommandPaletteDialogComponent } from '../features/commands/command-palette-dialog.component';
 import { PageTreeComponent } from '../features/page/page-tree.component';
 import { QuickSearchDialogComponent } from '../features/search/quick-search-dialog.component';
+import { SplitPanePreviewComponent } from '../features/workspace/split-pane-preview.component';
+import { WorkspaceTabsBarComponent } from '../features/workspace/workspace-tabs-bar.component';
 
 @Component({
   selector: 'trz-app-shell',
@@ -39,6 +46,8 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
     AtralumeIcon,
     AtralumeIconButton,
     PageTreeComponent,
+    WorkspaceTabsBarComponent,
+    SplitPanePreviewComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -118,6 +127,25 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
           <a routerLink="/templates" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
             <atr-icon name="file-text" size="small" />
             <span>Plantillas</span>
+          </a>
+          <a routerLink="/daily" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="book" size="small" />
+            <span>Diario</span>
+          </a>
+          <a routerLink="/reminders" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="info" size="small" />
+            <span>Recordatorios</span>
+            @if (reminders.overdueReminders().length > 0) {
+              <span class="mini-badge">{{ reminders.overdueReminders().length }}</span>
+            }
+          </a>
+          <a routerLink="/import" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="plus" size="small" />
+            <span>Importar</span>
+          </a>
+          <a routerLink="/health" routerLinkActive="is-active" class="quick-nav-link" (click)="closeOnMobile()">
+            <atr-icon name="check" size="small" />
+            <span>Salud</span>
           </a>
         </div>
 
@@ -280,6 +308,17 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
               type="button"
               size="small"
               appearance="text"
+              title="Paleta de comandos (Ctrl+Shift+P)"
+              (click)="openCommandPalette()"
+            >
+              Comandos
+            </button>
+
+            <button
+              atrButton
+              type="button"
+              size="small"
+              appearance="text"
               title="Búsqueda rápida (Ctrl+K)"
               (click)="openQuickSearch()"
             >
@@ -327,9 +366,30 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
           </div>
         </header>
 
-        <main class="content-area">
-          <router-outlet />
-        </main>
+        <trz-workspace-tabs-bar [isMobile]="isMobile()" />
+
+        <div
+          class="workspace-stage"
+          [class.is-split]="!isMobile() && tabs.splitEnabled()"
+          [style.--trz-split-left]="tabs.splitRatio() + '%'"
+        >
+          <main class="content-area">
+            <router-outlet />
+          </main>
+
+          @if (!isMobile() && tabs.splitEnabled()) {
+            <div
+              class="split-resizer"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Redimensionar paneles (flechas izquierda/derecha)"
+              tabindex="0"
+              (pointerdown)="startSplitResize($event)"
+              (keydown)="onSplitResizerKeydown($event)"
+            ></div>
+            <trz-split-pane-preview />
+          }
+        </div>
       </div>
     </div>
   `,
@@ -729,8 +789,41 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
       white-space: nowrap;
     }
 
+    .mini-badge {
+      font-size: 0.66rem;
+      font-weight: 700;
+      padding: 0.02rem 0.34rem;
+      border-radius: 999px;
+      background: var(--trz-danger);
+      color: #fff;
+    }
+
+    .workspace-stage {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+
+      &.is-split {
+        display: grid;
+        grid-template-columns: var(--trz-split-left, 50%) 6px minmax(0, 1fr);
+      }
+    }
+
+    .split-resizer {
+      background: var(--trz-border);
+      cursor: col-resize;
+      transition: background 120ms ease;
+
+      &:hover,
+      &:focus-visible {
+        background: var(--trz-accent);
+      }
+    }
+
     .content-area {
       flex: 1;
+      min-width: 0;
       overflow-y: auto;
       padding: 2rem 2.5rem;
     }
@@ -767,6 +860,10 @@ import { QuickSearchDialogComponent } from '../features/search/quick-search-dial
 export class AppShellComponent implements OnInit {
   protected readonly store = inject(KnowledgeStore);
   protected readonly meta = inject(KnowledgeMetaService);
+  protected readonly tabs = inject(WorkspaceTabsService);
+  protected readonly reminders = inject(RemindersService);
+  private readonly daily = inject(DailyNotesService);
+  private readonly shortcuts = inject(ShortcutsService);
   protected readonly auth = inject(AuthService);
   protected readonly theme = inject(ThemeService);
   protected readonly sync = inject(TrazenaSyncService);
@@ -777,6 +874,7 @@ export class AppShellComponent implements OnInit {
   private readonly dialog = inject(AtralumeDialog);
   private readonly destroyRef = inject(DestroyRef);
   private quickSearchOpen = false;
+  private commandPaletteOpen = false;
 
   protected readonly isMobile = signal(
     typeof window !== 'undefined' ? window.innerWidth <= 900 : false,
@@ -827,10 +925,10 @@ export class AppShellComponent implements OnInit {
       mql.addEventListener('change', onChange);
 
       const onKeydown = (ev: KeyboardEvent) => {
-        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
-          ev.preventDefault();
-          this.openQuickSearch();
-        }
+        const matched = this.shortcuts.matchCommand(ev);
+        if (!matched) return;
+        ev.preventDefault();
+        void this.dispatchShortcut(matched);
       };
       window.addEventListener('keydown', onKeydown);
 
@@ -849,12 +947,89 @@ export class AppShellComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    await this.store.initialize();
-    await this.meta.initialize();
+    await Promise.all([
+      this.store.initialize(),
+      this.meta.initialize(),
+      this.tabs.initialize(),
+      this.shortcuts.initialize(),
+      this.daily.initialize(),
+      this.reminders.initialize(),
+    ]);
+    this.tabs.pruneDeletedPages(
+      new Set(this.store.pages().filter((p) => p.status !== 'deleted').map((p) => p.id)),
+    );
     this.syncSelectedOrgFromUrl(this.router.url);
     if (!this.selectedOrgId()) {
       const first = this.store.activeOrganizations()[0];
       if (first) this.selectedOrgId.set(first.id);
+    }
+  }
+
+  private async dispatchShortcut(cmd: string): Promise<void> {
+    if (cmd === 'open_command_palette') this.openCommandPalette();
+    else if (cmd === 'open_quick_search') this.openQuickSearch();
+    else if (cmd === 'toggle_sidebar') this.sidebarOpen.update((v) => !v);
+    else if (cmd === 'split_right') this.tabs.splitRight();
+    else if (cmd === 'close_split') this.tabs.closeSplit();
+    else if (cmd === 'open_explorer') await this.router.navigateByUrl('/explore');
+    else if (cmd === 'open_health') await this.router.navigateByUrl('/health');
+    else if (cmd === 'open_import') await this.router.navigateByUrl('/import');
+    else if (cmd === 'open_settings') await this.router.navigateByUrl('/settings');
+    else if (cmd === 'sync_now') await this.triggerOneClickSync();
+    else if (cmd === 'open_daily_note') {
+      const page = await this.daily.openOrCreateForDate();
+      if (page) await this.router.navigateByUrl(this.store.getCanonicalPath(page.id));
+    } else if (cmd === 'new_page') {
+      const org = this.activeOrg();
+      const ws = org ? this.store.getWorkspacesForOrg(org.id)[0] : null;
+      if (org && ws) await this.quickCreatePage(org.id, ws.id, null);
+    }
+  }
+
+  protected openCommandPalette(): void {
+    if (this.commandPaletteOpen) return;
+    this.commandPaletteOpen = true;
+    const ref = this.dialog.open(CommandPaletteDialogComponent, {
+      size: 'm',
+      closable: false,
+    });
+    ref.afterClosed.subscribe({
+      complete: () => {
+        this.commandPaletteOpen = false;
+      },
+      error: () => {
+        this.commandPaletteOpen = false;
+      },
+    });
+  }
+
+  protected startSplitResize(event: PointerEvent): void {
+    event.preventDefault();
+    const stage = (event.target as HTMLElement).parentElement;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const onMove = (e: PointerEvent) => {
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      this.tabs.setSplitRatio(pct);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  protected onSplitResizerKeydown(event: KeyboardEvent): void {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      this.tabs.setSplitRatio(this.tabs.splitRatio() - 5);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.tabs.setSplitRatio(this.tabs.splitRatio() + 5);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      this.tabs.resetSplitRatio();
     }
   }
 

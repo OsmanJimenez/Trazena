@@ -99,6 +99,18 @@ export class KnowledgeStore {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
   );
 
+  readonly deletedWorkspaces = computed(() =>
+    this._workspaces()
+      .filter((w) => w.status === 'deleted')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  );
+
+  readonly deletedOrganizations = computed(() =>
+    this._organizations()
+      .filter((o) => o.status === 'deleted')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  );
+
   constructor() {
     this.sync.registerStoreHooks({
       reloadFromLocal: () => this.reloadFromIndexedDb(),
@@ -1018,6 +1030,140 @@ export class KnowledgeStore {
     this.upsertPageInSignal(updated);
     await this.sync.refreshState();
     return updated;
+  }
+
+  async reloadFromLocal(): Promise<void> {
+    await this.reloadFromIndexedDb();
+  }
+
+  /**
+   * Restores a deleted page and all of its deleted descendants as a coherent branch.
+   * Allows choosing an alternative destination workspace/parent when the original parent no longer exists.
+   */
+  async restorePageBranch(
+    rootPageId: string,
+    targetWorkspaceId?: string,
+    targetParentId?: string | null,
+  ): Promise<Page[]> {
+    const root = this._pages().find((p) => p.id === rootPageId);
+    if (!root) throw new Error('Página no encontrada en papelera.');
+
+    const uid = this.ownerUid;
+    const device = await this.idb.getOrCreateDevice(uid);
+    const now = new Date().toISOString();
+
+    const wsPages = this._pages().filter((p) => p.workspaceId === root.workspaceId);
+    const branchIds = [rootPageId, ...collectDescendantIds(wsPages, rootPageId)];
+    const branchSet = new Set(branchIds);
+    const destWsId = targetWorkspaceId ?? root.workspaceId;
+
+    const restored: Page[] = [];
+    for (const id of branchIds) {
+      const curr = this._pages().find((p) => p.id === id);
+      if (!curr || curr.status !== 'deleted') continue;
+
+      let nextParentId = curr.parentId;
+      if (id === rootPageId) {
+        if (targetParentId !== undefined) {
+          nextParentId = targetParentId;
+        } else if (nextParentId) {
+          const parent = this._pages().find((p) => p.id === nextParentId);
+          if (!parent || parent.status === 'deleted') nextParentId = null;
+        }
+      } else if (nextParentId && !branchSet.has(nextParentId)) {
+        nextParentId = rootPageId;
+      }
+
+      const siblings = this._pages().filter(
+        (p) =>
+          p.workspaceId === destWsId &&
+          p.parentId === nextParentId &&
+          p.id !== id &&
+          p.status !== 'deleted',
+      );
+
+      const updated: Page = {
+        ...curr,
+        workspaceId: destWsId,
+        parentId: nextParentId,
+        status: 'active',
+        slug: ensureUniqueSlug(
+          curr.slug,
+          siblings.map((p) => p.slug),
+        ),
+        updatedAt: now,
+        updatedBy: uid,
+      };
+
+      await this.idb.commitAtomicWithOutbox('pages', updated, {
+        operationId: crypto.randomUUID(),
+        deviceId: device.deviceId,
+        ownerUid: uid,
+        entityType: 'page',
+        entityId: updated.id,
+        operation: 'restore',
+        baseRevision: curr.revision,
+        payload: { ...updated },
+        createdAt: now,
+        updatedAt: now,
+        status: 'pending',
+      });
+      this.upsertPageInSignal(updated);
+      restored.push(updated);
+    }
+
+    await this.sync.refreshState();
+    return restored;
+  }
+
+  async restoreWorkspace(workspaceId: string): Promise<Workspace | null> {
+    const ws = this._workspaces().find((w) => w.id === workspaceId);
+    if (!ws) return null;
+    const uid = this.ownerUid;
+    const device = await this.idb.getOrCreateDevice(uid);
+    const now = new Date().toISOString();
+    const restored: Workspace = { ...ws, status: 'active', updatedAt: now, updatedBy: uid };
+    await this.idb.commitAtomicWithOutbox('workspaces', restored, {
+      operationId: crypto.randomUUID(),
+      deviceId: device.deviceId,
+      ownerUid: uid,
+      entityType: 'workspace',
+      entityId: restored.id,
+      operation: 'restore',
+      baseRevision: null,
+      payload: { ...restored },
+      createdAt: now,
+      updatedAt: now,
+      status: 'pending',
+    });
+    this._workspaces.update((list) => list.map((w) => (w.id === restored.id ? restored : w)));
+    await this.sync.refreshState();
+    return restored;
+  }
+
+  async restoreOrganization(orgId: string): Promise<Organization | null> {
+    const org = this._organizations().find((o) => o.id === orgId);
+    if (!org) return null;
+    const uid = this.ownerUid;
+    const device = await this.idb.getOrCreateDevice(uid);
+    const now = new Date().toISOString();
+    const restored: Organization = { ...org, status: 'active', updatedAt: now, updatedBy: uid };
+    await this.idb.commitAtomicWithOutbox('organizations', restored, {
+      operationId: crypto.randomUUID(),
+      deviceId: device.deviceId,
+      ownerUid: uid,
+      entityType: 'organization',
+      entityId: restored.id,
+      operation: 'restore',
+      baseRevision: null,
+      payload: { ...restored },
+      createdAt: now,
+      updatedAt: now,
+      status: 'pending',
+    });
+    this._organizations.update((list) => list.map((o) => (o.id === restored.id ? restored : o)));
+    await this.sync.refreshState();
+    return restored;
   }
 
   // --- Page History (max 3 previous full snapshots, manual deletion, non-destructive restore) ---

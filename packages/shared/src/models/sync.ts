@@ -1,10 +1,10 @@
 export const APP_PROTOCOL_VERSIONS = {
-  appVersion: '0.3.0',
+  appVersion: '0.4.0',
   apiVersion: 1,
   syncProtocolVersion: 1,
-  localSchemaVersion: 3,
-  remoteSchemaVersion: 3,
-  minimumCompatibleAppVersion: '0.2.0',
+  localSchemaVersion: 4,
+  remoteSchemaVersion: 4,
+  minimumCompatibleAppVersion: '0.3.0',
 } as const;
 
 export type SyncEntityType =
@@ -17,7 +17,10 @@ export type SyncEntityType =
   | 'property_value'
   | 'saved_view'
   | 'template'
-  | 'favorite';
+  | 'favorite'
+  | 'reminder'
+  | 'daily_note'
+  | 'page_review';
 
 export type SyncOperationKind =
   | 'create'
