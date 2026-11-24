@@ -13,7 +13,7 @@ import { syncRoutes } from './routes/sync.js';
 const app = new Hono<AppContext>();
 
 app.use('/api/*', async (c, next) => {
-  const allowed = (c.env.ALLOWED_ORIGINS ?? 'http://localhost:4200')
+  const allowed = (c.env.ALLOWED_ORIGINS ?? 'http://localhost:4315')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean);
@@ -21,13 +21,7 @@ app.use('/api/*', async (c, next) => {
   const corsHandler = cors({
     origin: (origin) => {
       if (!origin) return allowed[0] ?? '*';
-      if (
-        allowed.includes(origin) ||
-        allowed.includes('*') ||
-        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
-      ) {
-        return origin;
-      }
+      if (allowed.includes(origin) || allowed.includes('*')) return origin;
       return '';
     },
     allowHeaders: ['Authorization', 'Content-Type'],
