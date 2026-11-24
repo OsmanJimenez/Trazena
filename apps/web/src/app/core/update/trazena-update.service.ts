@@ -112,6 +112,7 @@ export class TrazenaUpdateService {
           eventCode: 'SW_UNRECOVERABLE_STATE',
           error: event.reason,
         });
+        void this.recoverCorruptedSwCacheOnce();
       });
 
       // Check on startup
@@ -217,6 +218,32 @@ export class TrazenaUpdateService {
         eventCode: 'UPDATE_APPLY_FAILED',
         error: err,
       });
+    }
+  }
+
+  /**
+   * Automatically clears only corrupted ngsw:* caches and unregisters the broken SW once per session
+   * when an unrecoverable state occurs online. Never touches IndexedDB or user data.
+   */
+  private async recoverCorruptedSwCacheOnce(): Promise<void> {
+    if (typeof window === 'undefined' || !navigator.onLine) return;
+    const flag = 'trz_sw_recovered_v1';
+    try {
+      if (sessionStorage.getItem(flag)) return;
+      sessionStorage.setItem(flag, '1');
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys.filter((k) => k.startsWith('ngsw:')).map((k) => caches.delete(k)),
+        );
+      }
+      window.location.reload();
+    } catch {
+      // Keep manual recovery option available in /recovery
     }
   }
 
