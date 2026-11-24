@@ -337,7 +337,7 @@ tui-dialog[data-appearance="atr-dialog"] {
   border-radius: var(--trz-radius-lg) !important;
   box-shadow: var(--trz-shadow-md) !important;
   padding: 1.35rem 1.5rem !important;
-  animation: trz-modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: trz-modal-in 110ms cubic-bezier(0.16, 1, 0.3, 1) both;
   pointer-events: auto !important;
 
   &.tui-enter,
@@ -348,17 +348,33 @@ tui-dialog[data-appearance="atr-dialog"] {
 
 tui-modal[role="dialog"],
 tui-modal[role="alertdialog"] {
+  --tui-duration: 110ms;
   pointer-events: auto !important;
-  animation: trz-fade-in 160ms ease-out both;
+  animation: trz-fade-in 90ms ease-out both;
 }
 
 .sidebar-backdrop {
-  animation: trz-fade-in 160ms ease-out both;
+  animation: trz-fade-in 120ms ease-out both;
 }
 
 atr-snackbar-panel,
 .atr-snackbar-panel {
-  animation: trz-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: trz-toast-in 140ms cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  button[atrIconButton].atr-icon-button {
+    color: currentColor !important;
+    opacity: 0.8;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    flex-shrink: 0;
+
+    &:hover {
+      opacity: 1;
+      background: color-mix(in srgb, currentColor 14%, transparent) !important;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
