@@ -193,11 +193,11 @@ export interface LocalDiagnosticEvent {
   timestamp: string;
   level: 'debug' | 'info' | 'warn' | 'error';
   category:
-    | 'app-update'
-    | 'database-migration'
-    | 'service-worker'
-    | 'sync'
-    | 'recovery';
+  | 'app-update'
+  | 'database-migration'
+  | 'service-worker'
+  | 'sync'
+  | 'recovery';
   phase: string;
   eventCode: string;
   appVersion: string;

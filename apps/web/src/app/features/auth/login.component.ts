@@ -23,11 +23,11 @@ import { AuthService } from '../../core/auth/auth.service';
             </div>
           </div>
 
-          @if (!auth.isFirebaseConfigured) {
+          @if (!auth.isRemoteApiEnabled) {
             <div class="auth-notice" role="status">
               <atr-icon name="info" size="small" />
               <span>
-                <strong>Modo bóveda local (IndexedDB):</strong> ingresa con cualquier correo para trabajar offline-first.
+                <strong>Modo bóveda local (IndexedDB):</strong> sin servidor API configurado; ingresa para trabajar offline-first.
               </span>
             </div>
           }

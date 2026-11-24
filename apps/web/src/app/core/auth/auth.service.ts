@@ -1,17 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { initializeApp, type FirebaseApp } from 'firebase/app';
-import {
-  browserLocalPersistence,
-  getAuth,
-  onAuthStateChanged,
-  sendPasswordResetEmail,
-  setPersistence,
-  signInWithEmailAndPassword,
-  signOut,
-  type Auth,
-  type User,
-} from 'firebase/auth';
 import { environment } from '../../../environments/environment';
 import { IndexedDbService } from '../storage/indexeddb.service';
 
@@ -19,7 +7,9 @@ export interface SessionUser {
   uid: string;
   email: string;
   displayName: string;
-  mode: 'firebase' | 'local';
+  mode: 'remote' | 'local';
+  token?: string;
+  expiresAt?: string;
 }
 
 const LOCAL_SESSION_KEY = 'trazena_local_session';
@@ -29,10 +19,6 @@ export class AuthService {
   private readonly router = inject(Router);
   private readonly idb = inject(IndexedDbService);
 
-  private firebaseApp: FirebaseApp | null = null;
-  private firebaseAuth: Auth | null = null;
-  private currentFirebaseUser: User | null = null;
-
   private readonly _user = signal<SessionUser | null>(null);
   private readonly _ready = signal(false);
   private readonly _error = signal<string | null>(null);
@@ -41,10 +27,11 @@ export class AuthService {
   readonly ready = this._ready.asReadonly();
   readonly error = this._error.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
-  readonly isFirebaseConfigured = Boolean(
-    environment.firebase.apiKey && environment.firebase.projectId,
+  readonly isRemoteApiEnabled = Boolean(environment.apiUrl?.trim());
+  readonly canSyncRemote = computed(
+    () => this.isRemoteApiEnabled && this._user()?.mode === 'remote' && Boolean(this._user()?.token),
   );
-  readonly isRemoteApiEnabled = Boolean(environment.apiUrl);
+  readonly isFirebaseConfigured = false;
 
   private initPromise: Promise<void> | null = null;
 
@@ -52,39 +39,19 @@ export class AuthService {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      if (this.isFirebaseConfigured) {
-        this.firebaseApp = initializeApp(environment.firebase);
-        this.firebaseAuth = getAuth(this.firebaseApp);
-        await setPersistence(this.firebaseAuth, browserLocalPersistence);
-
-        await new Promise<void>((resolve) => {
-          onAuthStateChanged(this.firebaseAuth!, (fbUser) => {
-            this.currentFirebaseUser = fbUser;
-            if (fbUser) {
-              this._user.set({
-                uid: fbUser.uid,
-                email: fbUser.email ?? '',
-                displayName: fbUser.displayName ?? fbUser.email?.split('@')[0] ?? 'Usuario',
-                mode: 'firebase',
-              });
-            } else {
-              this._user.set(null);
-            }
-            this._ready.set(true);
-            resolve();
-          });
-        });
-      } else {
-        // Offline-first Local Vault session stored in IndexedDB meta store
-        const stored = await this.idb.getByKey<{ key: string; value: SessionUser }>(
-          'meta',
-          LOCAL_SESSION_KEY,
-        );
-        if (stored?.value) {
+      const stored = await this.idb.getByKey<{ key: string; value: SessionUser }>(
+        'meta',
+        LOCAL_SESSION_KEY,
+      );
+      if (stored?.value) {
+        const exp = stored.value.expiresAt ? Date.parse(stored.value.expiresAt) : null;
+        if (!exp || exp > Date.now()) {
           this._user.set(stored.value);
+        } else {
+          await this.idb.delete('meta', LOCAL_SESSION_KEY);
         }
-        this._ready.set(true);
       }
+      this._ready.set(true);
     })();
 
     return this.initPromise;
@@ -94,91 +61,81 @@ export class AuthService {
     this._error.set(null);
     const trimmedEmail = email.trim().toLowerCase();
 
-    if (this.isFirebaseConfigured && this.firebaseAuth) {
-      try {
-        await signInWithEmailAndPassword(this.firebaseAuth, trimmedEmail, password);
-      } catch (err) {
-        const message = this.mapFirebaseError(err);
-        this._error.set(message);
-        throw new Error(message);
-      }
-      return;
-    }
-
-    // Local Vault mode when Firebase credentials are not configured yet
     if (!trimmedEmail || !trimmedEmail.includes('@') || password.length < 4) {
       const msg = 'Ingresa un correo válido y una contraseña de al menos 4 caracteres.';
       this._error.set(msg);
       throw new Error(msg);
     }
 
+    const apiUrl = environment.apiUrl?.trim().replace(/\/+$/, '');
+    if (apiUrl && navigator.onLine) {
+      try {
+        const res = await fetch(`${apiUrl}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail, password }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          mode?: 'remote' | 'local_only';
+          token?: string;
+          expiresAt?: string;
+          user?: { uid: string; email: string; displayName: string };
+          error?: { message?: string };
+        };
+
+        if (res.status === 401) {
+          const msg = data.error?.message || 'Contraseña incorrecta.';
+          this._error.set(msg);
+          throw new Error(msg);
+        }
+
+        if (res.ok && data.mode === 'remote' && data.token && data.user) {
+          const session: SessionUser = {
+            uid: data.user.uid,
+            email: data.user.email,
+            displayName: data.user.displayName,
+            mode: 'remote',
+            token: data.token,
+            expiresAt: data.expiresAt,
+          };
+          await this.idb.put('meta', { key: LOCAL_SESSION_KEY, value: session });
+          this._user.set(session);
+          return;
+        }
+        // Any other user (mode: 'local_only') falls through cleanly to Local IndexedDB Vault
+      } catch (err) {
+        if (err instanceof Error && err.message && !err.message.includes('Failed to fetch')) {
+          throw err;
+        }
+        // Network unreachable: allow offline Local Vault access
+      }
+    }
+
     const session: SessionUser = {
-      uid: `local-${trimmedEmail}`,
+      uid: `local:${trimmedEmail}`,
       email: trimmedEmail,
-      displayName: trimmedEmail.split('@')[0] || 'Propietario',
+      displayName: trimmedEmail.split('@')[0] || 'Usuario',
       mode: 'local',
     };
     await this.idb.put('meta', { key: LOCAL_SESSION_KEY, value: session });
     this._user.set(session);
   }
 
-  async sendPasswordReset(email: string): Promise<void> {
-    this._error.set(null);
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      throw new Error('Ingresa un correo electrónico válido.');
-    }
-
-    if (this.isFirebaseConfigured && this.firebaseAuth) {
-      try {
-        await sendPasswordResetEmail(this.firebaseAuth, trimmedEmail);
-      } catch (err) {
-        const message = this.mapFirebaseError(err);
-        this._error.set(message);
-        throw new Error(message);
-      }
-      return;
-    }
-
-    // In Local Vault mode, inform user cleanly without faking an email dispatch
+  async sendPasswordReset(_email: string): Promise<void> {
     throw new Error(
-      'Firebase Authentication no está configurado todavía en environment.ts. Configura tu proyecto Firebase para enviar correos de recuperación.',
+      'Trazena utiliza acceso privado de propietario único en Cloudflare Workers. Para cambiar la contraseña, actualiza el secreto OWNER_PASSWORD_HASH en Cloudflare.',
     );
   }
 
   async logout(): Promise<void> {
-    if (this.isFirebaseConfigured && this.firebaseAuth) {
-      await signOut(this.firebaseAuth);
-    } else {
-      await this.idb.delete('meta', LOCAL_SESSION_KEY);
-    }
+    await this.idb.delete('meta', LOCAL_SESSION_KEY);
     this._user.set(null);
     await this.router.navigate(['/login']);
   }
 
   async getIdToken(): Promise<string | null> {
-    if (this.currentFirebaseUser) {
-      return this.currentFirebaseUser.getIdToken();
-    }
-    if (this._user()?.mode === 'local') {
-      return 'dev-local-token';
-    }
-    return null;
-  }
-
-  private mapFirebaseError(err: unknown): string {
-    const code = (err as { code?: string })?.code ?? '';
-    switch (code) {
-      case 'auth/invalid-credential':
-      case 'auth/wrong-password':
-      case 'auth/user-not-found':
-        return 'Credenciales incorrectas. Verifica tu correo y contraseña.';
-      case 'auth/too-many-requests':
-        return 'Demasiados intentos fallidos. Intenta de nuevo en unos minutos.';
-      case 'auth/network-request-failed':
-        return 'No se pudo conectar con Firebase. Revisa tu conexión.';
-      default:
-        return 'No fue posible iniciar sesión. Verifica la configuración de Firebase.';
-    }
+    const u = this._user();
+    if (!u || u.mode !== 'remote' || !u.token) return null;
+    return u.token;
   }
 }

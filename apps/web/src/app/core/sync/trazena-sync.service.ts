@@ -176,7 +176,15 @@ export class TrazenaSyncService {
     if (!this.isRemoteConfigured()) {
       this._state.set('unconfigured');
       this._lastError.set(
-        'Modo local-first activo: configura environment.apiUrl y Firebase para sincronizar con Cloudflare D1.',
+        'Modo local-first activo: configura environment.apiUrl para sincronizar con Cloudflare D1.',
+      );
+      return null;
+    }
+
+    if (!this.auth.canSyncRemote()) {
+      this._state.set('unconfigured');
+      this._lastError.set(
+        'Esta cuenta funciona en modo bóveda local (IndexedDB). Solo el propietario tiene sincronización en la nube.',
       );
       return null;
     }

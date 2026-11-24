@@ -35,7 +35,7 @@ import { SettingsNavComponent } from './settings-nav.component';
           </div>
           <div class="info-row">
             <span>Proveedor activo</span>
-            <strong>{{ auth.isFirebaseConfigured ? 'Firebase Authentication' : 'Bóveda Local (IndexedDB)' }}</strong>
+            <strong>{{ auth.isRemoteApiEnabled ? 'Cloudflare Workers JWT (Usuario único)' : 'Bóveda Local (IndexedDB)' }}</strong>
           </div>
           <div class="info-row">
             <span>Sincronización remota</span>

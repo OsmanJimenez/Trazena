@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { APP_PROTOCOL_VERSIONS, type ApiVersionInfo } from '@trazena/shared';
 import type { AppContext } from './env.js';
 import { authMiddleware } from './middleware/auth.js';
+import { authRoutes } from './routes/auth.js';
 import { organizationsRoutes } from './routes/organizations.js';
 import { workspacesRoutes } from './routes/workspaces.js';
 import { pagesRoutes } from './routes/pages.js';
@@ -52,15 +53,20 @@ app.get('/api/version', (c) => {
   return c.json(info);
 });
 
-// All business endpoints require verified Firebase identity + D1 authorization
+// All business endpoints require verified Worker HS256 JWT + D1 authorization
 app.use('/api/*', async (c, next) => {
-  if (c.req.path === '/api/health' || c.req.path === '/api/version') {
+  if (
+    c.req.path === '/api/health' ||
+    c.req.path === '/api/version' ||
+    c.req.path === '/api/auth/login'
+  ) {
     await next();
     return;
   }
   return authMiddleware(c, next);
 });
 
+app.route('/api/auth', authRoutes);
 app.route('/api/organizations', organizationsRoutes);
 app.route('/api/workspaces', workspacesRoutes);
 app.route('/api/pages', pagesRoutes);
