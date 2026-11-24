@@ -530,8 +530,8 @@ syncRoutes.post('/sync/push', async (c) => {
           .first<PageRow>();
         const existingContent = existingPage
           ? await c.env.DB.prepare(`SELECT * FROM page_contents WHERE page_id = ?`)
-            .bind(op.entityId)
-            .first<PageContentRow>()
+              .bind(op.entityId)
+              .first<PageContentRow>()
           : null;
 
         const hasMarkdown = typeof p['markdown'] === 'string';
