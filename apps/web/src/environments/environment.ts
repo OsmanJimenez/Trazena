@@ -6,5 +6,5 @@ export interface AppEnvironment {
 
 export const environment: AppEnvironment = {
   production: false,
-  apiUrl: '',
+  apiUrl: 'https://trazena-api.osmanjimenez.dev',
 };

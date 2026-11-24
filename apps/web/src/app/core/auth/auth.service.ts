@@ -83,12 +83,6 @@ export class AuthService {
           error?: { message?: string };
         };
 
-        if (res.status === 401) {
-          const msg = data.error?.message || 'Contraseña incorrecta.';
-          this._error.set(msg);
-          throw new Error(msg);
-        }
-
         if (res.ok && data.mode === 'remote' && data.token && data.user) {
           const session: SessionUser = {
             uid: data.user.uid,
@@ -102,11 +96,9 @@ export class AuthService {
           this._user.set(session);
           return;
         }
-        // Any other user (mode: 'local_only') falls through cleanly to Local IndexedDB Vault
-      } catch (err) {
-        if (err instanceof Error && err.message && !err.message.includes('Failed to fetch')) {
-          throw err;
-        }
+        // Invalid credentials (401) or non-owner email (local_only) fall through cleanly
+        // to an isolated Local IndexedDB Vault with zero remote D1 access.
+      } catch {
         // Network unreachable: allow offline Local Vault access
       }
     }
