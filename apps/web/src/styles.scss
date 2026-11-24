@@ -134,6 +134,14 @@ body {
   h1, h2, h3, h4 { letter-spacing: -0.025em; margin: 1.4em 0 0.5em; line-height: 1.25; }
   p { margin: 0.6em 0; }
   a { color: var(--trz-accent); text-underline-offset: 3px; }
+  u { text-decoration: underline; text-underline-offset: 3px; }
+  mark {
+    color: inherit;
+    padding: 0.06em 0.28em;
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
   blockquote {
     margin: 0.9rem 0; padding: 0.55rem 0.95rem;
     border-left: 2px solid var(--trz-border-strong);
@@ -441,6 +449,19 @@ atr-snackbar-panel,
     text-decoration: underline;
     text-underline-offset: 3px;
     cursor: pointer;
+  }
+
+  u {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  mark {
+    color: inherit;
+    padding: 0.06em 0.28em;
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
 
   ul, ol {

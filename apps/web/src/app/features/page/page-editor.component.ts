@@ -41,7 +41,13 @@ import { ThemeService } from '../../core/state/theme.service';
 import { IndexedDbService } from '../../core/storage/indexeddb.service';
 import { TrazenaDialogsService } from '../../core/ui/trazena-dialogs.service';
 import { TrazenaUpdateService } from '../../core/update/trazena-update.service';
+import {
+  TrazenaHighlight,
+  TrazenaTextColor,
+  TrazenaUnderline,
+} from '../../core/editor/rich-marks.extensions';
 import { hydrateMermaidDiagrams, renderSafeMarkdown } from '../../core/utils/markdown.util';
+import { isNotionHtml, normalizePastedHtml } from '../../core/utils/notion-paste.util';
 import { WorkspaceTabsService } from '../../core/workspace/workspace-tabs.service';
 
 interface MarkdownStorage {
@@ -129,7 +135,9 @@ const SLASH_COMMANDS: readonly SlashCommandItem[] = [
             <span class="bar-sep"></span>
             <button type="button" class="fmt-btn" [class.active]="isActive('bold')" title="Negrita (Ctrl+B)" (click)="cmd('toggleBold')"><strong>B</strong></button>
             <button type="button" class="fmt-btn" [class.active]="isActive('italic')" title="Cursiva (Ctrl+I)" (click)="cmd('toggleItalic')"><em>I</em></button>
+            <button type="button" class="fmt-btn" [class.active]="isActive('underline')" title="Subrayado (Ctrl+U)" (click)="cmd('toggleUnderline')"><u>U</u></button>
             <button type="button" class="fmt-btn" [class.active]="isActive('strike')" title="Tachado" (click)="cmd('toggleStrike')"><s>S</s></button>
+            <button type="button" class="fmt-btn" [class.active]="isActive('highlight')" title="Resaltar texto" (click)="cmd('toggleHighlight')">Resaltar</button>
             <button type="button" class="fmt-btn" [class.active]="isActive('code')" title="Código en línea" (click)="cmd('toggleCode')"><code>&lt;/&gt;</code></button>
             <span class="bar-sep"></span>
             <button type="button" class="fmt-btn" [class.active]="isActive('bulletList')" title="Lista" (click)="cmd('toggleBulletList')">• Lista</button>
@@ -541,6 +549,7 @@ export class PageEditorComponent implements AfterViewInit {
         StarterKit.configure({
           codeBlock: false,
           link: false,
+          underline: false,
         }),
         CodeBlockLowlight.configure({ lowlight }),
         Placeholder.configure({
@@ -557,13 +566,30 @@ export class PageEditorComponent implements AfterViewInit {
           openOnClick: false,
           autolink: true,
         }),
+        TrazenaUnderline,
+        TrazenaTextColor,
+        TrazenaHighlight,
         Markdown.configure({
-          html: false,
+          html: true,
           tightLists: true,
           transformPastedText: true,
           transformCopiedText: true,
         }),
       ],
+      editorProps: {
+        transformPastedHTML: (html) => {
+          const fromNotion = isNotionHtml(html);
+          const cleaned = normalizePastedHtml(html);
+          if (fromNotion) {
+            this.snackbar.open({
+              message: 'Contenido de Notion pegado conservando formato y estilos.',
+              tone: 'success',
+              duration: 3000,
+            });
+          }
+          return cleaned;
+        },
+      },
       content: this.initialMarkdown() || '',
       onUpdate: () => {
         const md = this.getMarkdownFromTiptap();
@@ -673,7 +699,9 @@ export class PageEditorComponent implements AfterViewInit {
     action:
       | 'toggleBold'
       | 'toggleItalic'
+      | 'toggleUnderline'
       | 'toggleStrike'
+      | 'toggleHighlight'
       | 'toggleCode'
       | 'toggleBulletList'
       | 'toggleOrderedList'

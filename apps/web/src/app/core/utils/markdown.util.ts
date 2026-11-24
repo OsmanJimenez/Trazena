@@ -162,6 +162,8 @@ export function renderSafeMarkdown(markdown: string): string {
       'data-mermaid',
       'data-tone',
       'data-page-id',
+      'data-color',
+      'style',
       'type',
       'checked',
       'disabled',
