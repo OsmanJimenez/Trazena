@@ -21,7 +21,13 @@ app.use('/api/*', async (c, next) => {
   const corsHandler = cors({
     origin: (origin) => {
       if (!origin) return allowed[0] ?? '*';
-      if (allowed.includes(origin) || allowed.includes('*')) return origin;
+      if (
+        allowed.includes(origin) ||
+        allowed.includes('*') ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
+      ) {
+        return origin;
+      }
       return '';
     },
     allowHeaders: ['Authorization', 'Content-Type'],
